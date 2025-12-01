@@ -1,111 +1,100 @@
-# ai.py
-# Módulo de Inteligencia Artificial basado en el algoritmo Minimax.
-# Este módulo se encarga de calcular el movimiento óptimo para la computadora.
-
+# game/ai.py
 from game.logic import LogicaTresRayas
 from copy import deepcopy 
 
+# --- (MANTENER minimax y ia_decidir_movimiento IGUALES) ---
 def minimax(tablero, profundidad, es_turno_max):
-    """
-    Función recursiva que simula todos los posibles juegos futuros.
-    
-    Parámetros:
-    - tablero: Estado actual del tablero (lista de 9 elementos).
-    - profundidad: Nivel actual en el árbol de decisión (qué tan lejos estamos del inicio).
-    - es_turno_max: Booleano. True si juega la IA (Maximizador), False si juega el Humano (Minimizador).
-    """
-    
-    # Instanciamos la lógica solo para usar sus métodos de verificación (ganador/empate)
     juego = LogicaTresRayas()
     juego.tablero = tablero 
     ganador = juego.verificar_ganador()
 
-    # --- 1. CASO BASE (Estados Terminales) ---
-    
-    # Si la IA (X) gana, retornamos un valor positivo.
-    # Restamos la profundidad para premiar las victorias más rápidas (menos movimientos).
-    if ganador == "X":
-        return 10 - profundidad 
-    
-    # Si el Humano (O) gana, retornamos un valor negativo.
-    # Sumamos la profundidad (o restamos de un negativo) para que la IA prefiera perder tarde a perder temprano.
-    elif ganador == "O":
-        return profundidad - 10 
-    
-    # Si no hay espacios libres y nadie ganó, es un Empate.
-    elif not juego.existe_espacio_libre():
-        return 0 
+    if ganador == "X": return 10 - profundidad 
+    elif ganador == "O": return profundidad - 10 
+    elif not juego.existe_espacio_libre(): return 0 
 
-    # --- 2. PASO RECURSIVO ---
-    
     if es_turno_max:
-        # Turno de la IA (MAX): Busca el valor más alto posible.
-        mejor_puntaje = -float('inf')
-        
-        for movimiento in juego.obtener_movimientos_posibles():
-            # Simular movimiento
-            juego.tablero[movimiento] = "X" 
-            
-            # Llamada recursiva: Ahora es turno del oponente (False)
+        mejor = -float('inf')
+        for mov in juego.obtener_movimientos_posibles():
+            juego.tablero[mov] = "X" 
             puntaje = minimax(juego.tablero, profundidad + 1, False)
-            
-            # Deshacer movimiento (Backtracking) para probar el siguiente
-            juego.tablero[movimiento] = " "
-            
-            # Nos quedamos con el puntaje más alto encontrado
-            mejor_puntaje = max(mejor_puntaje, puntaje)
-            
-        return mejor_puntaje
-    
+            juego.tablero[mov] = " "
+            mejor = max(mejor, puntaje)
+        return mejor
     else:
-        # Turno del Humano (MIN): Asumimos que jugará perfecto para perjudicarnos.
-        # Busca el valor más bajo posible (hacernos perder).
-        mejor_puntaje = float('inf')
-        
-        for movimiento in juego.obtener_movimientos_posibles():
-            # Simular movimiento del oponente
-            juego.tablero[movimiento] = "O"
-            
-            # Llamada recursiva: Ahora es turno de la IA (True)
+        mejor = float('inf')
+        for mov in juego.obtener_movimientos_posibles():
+            juego.tablero[mov] = "O"
             puntaje = minimax(juego.tablero, profundidad + 1, True)
-            
-            # Deshacer movimiento
-            juego.tablero[movimiento] = " "
-            
-            # Nos quedamos con el puntaje más bajo (el peor escenario para la IA)
-            mejor_puntaje = min(mejor_puntaje, puntaje)
-            
-        return mejor_puntaje
-
+            juego.tablero[mov] = " "
+            mejor = min(mejor, puntaje)
+        return mejor
 
 def ia_decidir_movimiento(tablero):
-    """
-    Función principal que la interfaz llama para obtener la jugada de la IA.
-    Retorna el mejor índice (0-8) y una lista de datos para visualizar el grafo.
-    """
-    datos_grafico = [] # Lista de tuplas (indice, puntaje) para el requerimiento de la GUI
     mejor_puntaje = -float('inf')
     mejor_movimiento = None
-
-    # Iteramos sobre todas las casillas disponibles en el tablero real
     for movimiento in range(9):
         if tablero[movimiento] == " ":
-            # Creamos una copia para no alterar el tablero del juego actual
             tablero_copia = deepcopy(tablero)
-            
-            # La IA prueba poner su ficha ("X")
-            tablero_copia[movimiento] = "X" 
-            
-            # Calculamos el valor de esta jugada usando Minimax.
-            # Pasamos 'False' porque después de que la IA juega, le toca al Humano.
+            tablero_copia[movimiento] = "X"
             puntaje = minimax(tablero_copia, 0, False)
-            
-            # Guardamos el puntaje para mostrarlo en la interfaz (requisito del proyecto)
-            datos_grafico.append((movimiento, puntaje))
-            
-            # Si esta jugada tiene mejor puntuación que la anterior, la elegimos
             if puntaje > mejor_puntaje:
                 mejor_puntaje = puntaje
                 mejor_movimiento = movimiento
+    return mejor_movimiento, [] 
+
+# --- SIN LÍMITES: MUESTRA TODO EL ABANICO ---
+def generar_camino_visual(tablero, profundidad_max=4):
     
-    return mejor_movimiento, datos_grafico
+    def construir_nivel(tablero_actual, profundidad, es_turno_ia):
+        juego = LogicaTresRayas()
+        juego.tablero = tablero_actual
+        if profundidad == 0 or juego.juego_terminado():
+            return []
+
+        movimientos = juego.obtener_movimientos_posibles()
+        nodos_hermanos = []
+        
+        # 1. Generar TODOS los hijos
+        for mov in movimientos:
+            tablero_futuro = deepcopy(tablero_actual)
+            ficha = "X" if es_turno_ia else "O"
+            tablero_futuro[mov] = ficha
+            
+            utilidad = minimax(tablero_futuro, 0, not es_turno_ia)
+            
+            nodo = {
+                "movimiento": mov,
+                "tablero": tablero_futuro,
+                "puntaje": utilidad,
+                "es_turno_ia": es_turno_ia,
+                "es_camino_ganador": False, 
+                "sub_ramas": [] 
+            }
+            nodos_hermanos.append(nodo)
+        
+        if not nodos_hermanos: return []
+
+        # 2. Identificar MEJOR
+        if es_turno_ia:
+            mejor_nodo = max(nodos_hermanos, key=lambda x: x["puntaje"])
+        else:
+            mejor_nodo = min(nodos_hermanos, key=lambda x: x["puntaje"])
+        
+        mejor_nodo["es_camino_ganador"] = True
+        
+        # 3. Profundidad Selectiva (Solo el mejor tiene hijos)
+        if profundidad > 1:
+            mejor_nodo["sub_ramas"] = construir_nivel(
+                mejor_nodo["tablero"], 
+                profundidad - 1, 
+                not es_turno_ia
+            )
+            
+        # 4. Devolvemos TODOS los hermanos (sin recortar a 3)
+        # Y ordenamos para que los mejores queden cerca (opcional, pero ayuda visualmente)
+        reverse_sort = True if es_turno_ia else False
+        nodos_hermanos = sorted(nodos_hermanos, key=lambda x: x["puntaje"], reverse=reverse_sort)
+
+        return nodos_hermanos
+
+    return construir_nivel(tablero, profundidad_max, True)
