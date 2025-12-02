@@ -14,15 +14,15 @@ COLOR_TEXTO = "#FFFFFF"
 COLOR_LINEA = "#5c6bc0"
 COLOR_BOTON = "#2c2f66"
 COLOR_BOTON_HOVER = "#3e4291"
-COLOR_WIN_PATH = "#FFD700" 
 
 # --- DIMENSIONES ---
-ANCHO_VENTANA = 1200 
+ANCHO_VENTANA = 1360
 ALTO_VENTANA = 760
 TAMANO_CASILLA = 90
-TAMANO_MINI = 26      
-ESPACIO_VERTICAL_ARBOL = 120 
-LIMITE_IZQUIERDO_ARBOL = 380 
+TAMANO_MINI = 26      # Reducido ligeramente para evitar cualquier solapamiento
+ESPACIO = 10
+ESPACIO_VERTICAL_ARBOL = 130 # Buen aire vertical
+ANCHO_SECCION_ARBOL = 850
 
 class InterfazGrafica:
     def __init__(self):
@@ -30,223 +30,141 @@ class InterfazGrafica:
         self.pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
         pygame.display.set_caption("Tres en Raya - Minimax")
         
+        # Fuentes ajustadas
         self.fuente_titulo = pygame.font.SysFont("Arial", 28, bold=True)
         self.fuente_ficha = pygame.font.SysFont("Arial", 60, bold=True)
-        self.fuente_mini = pygame.font.SysFont("Arial", 16, bold=True)
+        self.fuente_mini = pygame.font.SysFont("Arial", 16, bold=True) # Fuente más pequeña para que quepa en el mini cuadro
         self.fuente_ui = pygame.font.SysFont("Arial", 14)
-        self.fuente_flechas = pygame.font.SysFont("Arial", 30, bold=True)
 
-        self.ancho_juego = (TAMANO_CASILLA * 3) + 40
+        self.ancho_juego = (TAMANO_CASILLA * 3) + (ESPACIO * 4)
         self.inicio_x = 50
         self.inicio_y = 150
         self.rect_boton = pygame.Rect(50, ALTO_VENTANA - 90, 200, 50)
 
-        self.scroll_y = 0
-        self.rect_up = pygame.Rect(ANCHO_VENTANA - 50, ALTO_VENTANA // 2 - 60, 40, 40)
-        self.rect_down = pygame.Rect(ANCHO_VENTANA - 50, ALTO_VENTANA // 2 + 10, 40, 40)
-
-    def dibujar_mini_tablero(self, x, y, nodo_data, tamano):
+    def dibujar_mini_tablero(self, x, y, tablero_data, tamano, puntaje=None):
         padding = 2
         ancho_total = (tamano * 3) + (padding * 4)
-        tablero = nodo_data["tablero"]
-        es_ganador = nodo_data.get("es_camino_ganador", False)
-        puntaje = nodo_data.get("puntaje", "")
-
-        if es_ganador:
-            color_borde = COLOR_WIN_PATH
-            grosor = 3
-            pygame.draw.rect(self.pantalla, "#FFFFAA", (x-2, y-2, ancho_total+4, ancho_total+4), border_radius=5)
-        else:
-            color_borde = "#5555aa"
-            grosor = 1
+        
+        # Borde de utilidad
+        color_borde = COLOR_TABLERO
+        if puntaje is not None:
+            if puntaje > 0: color_borde = "#33ff33" # Verde
+            elif puntaje < 0: color_borde = "#ff3333" # Rojo
+            else: color_borde = "#cccccc" # Gris
 
         pygame.draw.rect(self.pantalla, color_borde, (x, y, ancho_total, ancho_total), border_radius=4)
-        pygame.draw.rect(self.pantalla, COLOR_TABLERO, (x+grosor, y+grosor, ancho_total-(grosor*2), ancho_total-(grosor*2)), border_radius=4)
+        pygame.draw.rect(self.pantalla, COLOR_TABLERO, (x+2, y+2, ancho_total-4, ancho_total-4), border_radius=4)
 
         for i in range(9):
-            fila, col = i // 3, i % 3
+            fila = i // 3
+            col = i % 3
             px = x + padding + col * (tamano + padding)
             py = y + padding + fila * (tamano + padding)
+            
             pygame.draw.rect(self.pantalla, COLOR_CASILLA, (px, py, tamano, tamano), border_radius=2)
-            if tablero[i] != " ":
-                c = COLOR_X if tablero[i] == "X" else COLOR_O
-                t = self.fuente_mini.render(tablero[i], True, c)
-                self.pantalla.blit(t, t.get_rect(center=(px + tamano/2, py + tamano/2)))
-        
-        if es_ganador and str(puntaje) != "":
-             self.pantalla.blit(self.fuente_ui.render(str(puntaje), True, COLOR_WIN_PATH), (x + ancho_total - 10, y - 15))
+            
+            if tablero_data[i] != " ":
+                color = COLOR_X if tablero_data[i] == "X" else COLOR_O
+                # Corrección de centrado
+                txt = self.fuente_mini.render(tablero_data[i], True, color)
+                rect = txt.get_rect(center=(px + tamano/2, py + tamano/2))
+                self.pantalla.blit(txt, rect)
         
         return (x + ancho_total // 2, y + ancho_total)
 
-    def dibujar_arbol_unificado(self, trayectoria, arbol_futuro, centro_x):
-        # 1. APLANAR
-        niveles_a_dibujar = []
-        if trayectoria:
-            for paso in trayectoria: niveles_a_dibujar.append(paso)
+    def dibujar_arbol_recursivo(self, nodos, x_min, x_max, y_nivel, padre_pos=None):
+        if not nodos: return
+
+        cantidad = len(nodos)
         
-        if arbol_futuro:
-             mejor_futuro = None
-             for n in arbol_futuro:
-                 if n.get("es_camino_ganador"):
-                     mejor_futuro = n; break
-             if not mejor_futuro and arbol_futuro: mejor_futuro = arbol_futuro[0]
-
-             if mejor_futuro:
-                 niveles_a_dibujar.append({"elegido": mejor_futuro, "hermanos": arbol_futuro})
-                 if mejor_futuro.get("sub_ramas"):
-                     siguientes = mejor_futuro["sub_ramas"]
-                     mejor_sig = None
-                     for n in siguientes:
-                         if n.get("es_camino_ganador"): mejor_sig = n; break
-                     if not mejor_sig and siguientes: mejor_sig = siguientes[0]
-                     niveles_a_dibujar.append({"elegido": mejor_sig, "hermanos": siguientes})
-
-        # 2. SCROLL
-        y_base = 100
-        y_inicio = y_base - self.scroll_y
-
-        ultimo_punto_conexion = None
-        ancho_nodo = (TAMANO_MINI * 3) + 8
-        espacio_h = 8 
+        # Lógica de alineación vertical estricta si es hijo único
+        if cantidad == 1 and padre_pos:
+            ancho_nodo_px = (TAMANO_MINI * 3) + 8
+            pos_x = padre_pos[0] - (ancho_nodo_px / 2) # Alineación vertical perfecta
+            espacio_por_nodo = 0
+        else:
+            ancho_disponible = x_max - x_min
+            espacio_por_nodo = ancho_disponible / cantidad
+            ancho_nodo_px = (TAMANO_MINI * 3) + 8
         
-        # Variable para recordar dónde cayó la columna dorada
-        x_columna_vertebral = centro_x
+        for i, nodo in enumerate(nodos):
+            if not (cantidad == 1 and padre_pos):
+                center_x = x_min + (i * espacio_por_nodo) + (espacio_por_nodo / 2)
+                pos_x = center_x - (ancho_nodo_px / 2)
 
-        for i, nivel in enumerate(niveles_a_dibujar):
-            pos_y = y_inicio + (i * ESPACIO_VERTICAL_ARBOL)
+            pos_y = y_nivel
+            punto_conexion_top = (pos_x + (ancho_nodo_px / 2), pos_y)
             
-            if pos_y < -50: 
-                ultimo_punto_conexion = (x_columna_vertebral, pos_y + ancho_nodo)
-                continue
-            if pos_y > ALTO_VENTANA + 50: break 
-
-            elegido = nivel["elegido"]
-            hermanos_raw = nivel["hermanos"]
-
-            # === FILTRO DE VISUALIZACIÓN (EL EMBUDO) ===
-            # Si es Nivel 0 o 1, mostramos todos.
-            # Si es Nivel 2 o superior, SOLO mostramos al elegido (borramos a los otros).
-            if i <= 1:
-                hermanos = hermanos_raw
-            else:
-                hermanos = [elegido] # Solo queda el camino dorado
-
-            # Ordenar (solo relevante para el nivel 1)
-            hermanos = sorted(hermanos, key=lambda x: x["movimiento"] if x["movimiento"] is not None else -1)
-
-            # === ALINEACIÓN ===
-            
-            if i <= 1:
-                # Lógica de ABANICO (Nivel 1)
-                # Centramos el bloque entero en la pantalla
-                cantidad = len(hermanos)
-                ancho_total_bloque = (cantidad * ancho_nodo) + ((cantidad - 1) * espacio_h)
-                start_x = centro_x - (ancho_total_bloque / 2)
-                
-                # Barras horizontales
-                primer_hijo_cx = start_x + (ancho_nodo / 2)
-                ultimo_hijo_cx = start_x + ancho_total_bloque - (ancho_nodo / 2)
+            if padre_pos:
                 mid_y = pos_y - (ESPACIO_VERTICAL_ARBOL / 2)
+                pygame.draw.line(self.pantalla, COLOR_LINEA, padre_pos, (padre_pos[0], mid_y), 2)
+                pygame.draw.line(self.pantalla, COLOR_LINEA, (padre_pos[0], mid_y), (punto_conexion_top[0], mid_y), 2)
+                pygame.draw.line(self.pantalla, COLOR_LINEA, (punto_conexion_top[0], mid_y), punto_conexion_top, 2)
 
-                if ultimo_punto_conexion:
-                    pygame.draw.line(self.pantalla, COLOR_WIN_PATH, ultimo_punto_conexion, (ultimo_punto_conexion[0], mid_y), 3)
-                    if cantidad > 1:
-                        pygame.draw.line(self.pantalla, COLOR_LINEA, (primer_hijo_cx, mid_y), (ultimo_hijo_cx, mid_y), 2)
+            punto_conexion_bottom = self.dibujar_mini_tablero(pos_x, pos_y, nodo["tablero"], TAMANO_MINI, nodo["puntaje"])
 
-                punto_conexion_para_siguiente = None
+            # Puntaje
+            p_val = nodo["puntaje"]
+            col_p = "#ccffcc" if p_val > 0 else ("#ffcccc" if p_val < 0 else "#ffffff")
+            self.pantalla.blit(self.fuente_ui.render(str(p_val), True, col_p), (pos_x + ancho_nodo_px + 3, pos_y + 10))
 
-                for idx, nodo in enumerate(hermanos):
-                    pos_x = start_x + (idx * (ancho_nodo + espacio_h))
-                    center_top = (pos_x + ancho_nodo/2, pos_y)
-                    
-                    if ultimo_punto_conexion:
-                        es_el_ganador = (nodo == elegido or nodo["movimiento"] == elegido["movimiento"])
-                        color_l = COLOR_WIN_PATH if es_el_ganador else COLOR_LINEA
-                        grosor_l = 3 if es_el_ganador else 2
-                        
-                        pygame.draw.line(self.pantalla, color_l, (center_top[0], mid_y), center_top, grosor_l)
-                        
-                        if es_el_ganador:
-                            pygame.draw.line(self.pantalla, COLOR_WIN_PATH, (ultimo_punto_conexion[0], mid_y), (center_top[0], mid_y), 3)
-
-                    centro_inf = self.dibujar_mini_tablero(pos_x, pos_y, nodo, TAMANO_MINI)
-
-                    if nodo == elegido or nodo["movimiento"] == elegido["movimiento"]:
-                        punto_conexion_para_siguiente = centro_inf
-
-                # Actualizamos el eje de la columna vertebral
-                if punto_conexion_para_siguiente:
-                    ultimo_punto_conexion = punto_conexion_para_siguiente
-                    x_columna_vertebral = punto_conexion_para_siguiente[0]
+            # Recursividad
+            if nodo["sub_ramas"]:
+                if cantidad == 1:
+                    self.dibujar_arbol_recursivo(nodo["sub_ramas"], x_min, x_max, y_nivel + ESPACIO_VERTICAL_ARBOL, punto_conexion_bottom)
                 else:
-                    ultimo_punto_conexion = (centro_x, pos_y + ancho_nodo)
+                    x_min_hijo = x_min + (i * espacio_por_nodo)
+                    x_max_hijo = x_min + ((i + 1) * espacio_por_nodo)
+                    self.dibujar_arbol_recursivo(nodo["sub_ramas"], x_min_hijo, x_max_hijo, y_nivel + ESPACIO_VERTICAL_ARBOL, punto_conexion_bottom)
 
-            else:
-                # LÓGICA DE COLUMNA ÚNICA (Nivel 2+)
-                # Dibujamos solo al elegido en el eje x_columna_vertebral
-                pos_x = x_columna_vertebral - (ancho_nodo // 2)
-                center_top = (x_columna_vertebral, pos_y)
-                
-                if ultimo_punto_conexion:
-                    pygame.draw.line(self.pantalla, COLOR_WIN_PATH, ultimo_punto_conexion, center_top, 3)
-                
-                centro_inf = self.dibujar_mini_tablero(pos_x, pos_y, elegido, TAMANO_MINI)
-                
-                ultimo_punto_conexion = centro_inf
-
-    def dibujar_controles_scroll(self):
-        color_up = COLOR_BOTON_HOVER if self.rect_up.collidepoint(pygame.mouse.get_pos()) else COLOR_BOTON
-        pygame.draw.rect(self.pantalla, color_up, self.rect_up, border_radius=5)
-        txt_up = self.fuente_flechas.render("^", True, COLOR_TEXTO)
-        self.pantalla.blit(txt_up, txt_up.get_rect(center=self.rect_up.center))
-
-        color_down = COLOR_BOTON_HOVER if self.rect_down.collidepoint(pygame.mouse.get_pos()) else COLOR_BOTON
-        pygame.draw.rect(self.pantalla, color_down, self.rect_down, border_radius=5)
-        txt_down = self.fuente_flechas.render("v", True, COLOR_TEXTO)
-        self.pantalla.blit(txt_down, txt_down.get_rect(center=self.rect_down.center))
-
-    def dibujar_interfaz(self, tablero, mensaje, trayectoria=None, arbol_futuro=None):
+    def dibujar_interfaz(self, tablero, mensaje, tablero_raiz=None, estructura_arbol=None):
         self.pantalla.fill(COLOR_FONDO)
+        
+        # Izquierda
         self.pantalla.blit(self.fuente_titulo.render(mensaje, True, COLOR_TEXTO), (self.inicio_x, 80))
         pygame.draw.rect(self.pantalla, COLOR_TABLERO, (self.inicio_x, self.inicio_y, self.ancho_juego, self.ancho_juego), border_radius=20)
         for i in range(9):
-            x, y = self.inicio_x + 10 + (i%3)*(TAMANO_CASILLA+10), self.inicio_y + 10 + (i//3)*(TAMANO_CASILLA+10)
+            fila, col = i // 3, i % 3
+            x, y = self.inicio_x + ESPACIO + col*(TAMANO_CASILLA+ESPACIO), self.inicio_y + ESPACIO + fila*(TAMANO_CASILLA+ESPACIO)
             pygame.draw.rect(self.pantalla, COLOR_CASILLA, (x, y, TAMANO_CASILLA, TAMANO_CASILLA), border_radius=15)
             if tablero[i] != " ":
-                c, t = (COLOR_X, "X") if tablero[i]=="X" else (COLOR_O, "O")
-                txt = self.fuente_ficha.render(t, True, c)
-                self.pantalla.blit(txt, txt.get_rect(center=(x+TAMANO_CASILLA/2, y+TAMANO_CASILLA/2)))
+                color = COLOR_X if tablero[i] == "X" else COLOR_O
+                txt = self.fuente_ficha.render(tablero[i], True, color)
+                self.pantalla.blit(txt, txt.get_rect(center=(x + TAMANO_CASILLA/2, y + TAMANO_CASILLA/2)))
 
+        # Botón
         color_btn = COLOR_BOTON_HOVER if self.rect_boton.collidepoint(pygame.mouse.get_pos()) else COLOR_BOTON
         pygame.draw.rect(self.pantalla, color_btn, self.rect_boton, border_radius=10)
-        self.pantalla.blit(self.fuente_ui.render("Nueva Partida", True, COLOR_TEXTO), (self.rect_boton.x+60, self.rect_boton.y+17))
+        self.pantalla.blit(self.fuente_ui.render("Nueva Partida", True, COLOR_TEXTO), (self.rect_boton.x + 55, self.rect_boton.y + 17))
 
-        ancho_zona = ANCHO_VENTANA - LIMITE_IZQUIERDO_ARBOL
-        centro_x = LIMITE_IZQUIERDO_ARBOL + (ancho_zona // 2)
-        pygame.draw.rect(self.pantalla, COLOR_FONDO, (LIMITE_IZQUIERDO_ARBOL, 0, ancho_zona, 80))
-        self.pantalla.blit(self.fuente_titulo.render("Evolución de la Partida", True, COLOR_TEXTO), (centro_x - 140, 30))
-
-        self.dibujar_arbol_unificado(trayectoria, arbol_futuro, centro_x)
-        self.dibujar_controles_scroll()
-        pygame.display.flip()
+        # Derecha (Árbol)
+        titulo_arbol = self.fuente_titulo.render("Árbol de Decisiones (Tú -> IA)", True, COLOR_TEXTO)
+        self.pantalla.blit(titulo_arbol, (ANCHO_VENTANA - ANCHO_SECCION_ARBOL//2 - 150, 40))
         
+        inicio_arbol_x = ANCHO_VENTANA - ANCHO_SECCION_ARBOL - 20
+        fin_arbol_x = ANCHO_VENTANA - 20
+        centro_arbol_x = inicio_arbol_x + (ANCHO_SECCION_ARBOL // 2)
+
+        tablero_a_usar = tablero_raiz if tablero_raiz else tablero
+        ancho_nodo = (TAMANO_MINI * 3) + 8
+        punto_raiz = self.dibujar_mini_tablero(centro_arbol_x - ancho_nodo//2, 100, tablero_a_usar, TAMANO_MINI)
+
+        if estructura_arbol:
+            self.dibujar_arbol_recursivo(estructura_arbol, inicio_arbol_x, fin_arbol_x, 100 + ESPACIO_VERTICAL_ARBOL, punto_raiz)
+
+        pygame.display.flip()
+
     def obtener_evento_usuario(self):
-        for e in pygame.event.get():
-            if e.type == pygame.QUIT: return 'SALIR'
-            if e.type == pygame.MOUSEWHEEL:
-                self.scroll_y -= e.y * 30
-                if self.scroll_y < 0: self.scroll_y = 0
-            if e.type == pygame.MOUSEBUTTONDOWN:
-                if self.rect_boton.collidepoint(e.pos): 
-                    self.scroll_y = 0; return 'REINICIAR'
-                if self.rect_up.collidepoint(e.pos):
-                    self.scroll_y -= 50
-                    if self.scroll_y < 0: self.scroll_y = 0
-                if self.rect_down.collidepoint(e.pos):
-                    self.scroll_y += 50
-                if self.inicio_x<e.pos[0]<self.inicio_x+self.ancho_juego and self.inicio_y<e.pos[1]<self.inicio_y+self.ancho_juego:
-                    c = (e.pos[0]-self.inicio_x)//(TAMANO_CASILLA+10)
-                    f = (e.pos[1]-self.inicio_y)//(TAMANO_CASILLA+10)
-                    if 0<=c<3 and 0<=f<3: return f*3+c
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT: return 'SALIR'
+            if evento.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                if self.rect_boton.collidepoint(x, y): return 'REINICIAR'
+                if (self.inicio_x < x < self.inicio_x + self.ancho_juego and self.inicio_y < y < self.inicio_y + self.ancho_juego):
+                    col = (x - self.inicio_x) // (TAMANO_CASILLA + ESPACIO)
+                    fila = (y - self.inicio_y) // (TAMANO_CASILLA + ESPACIO)
+                    if 0 <= col < 3 and 0 <= fila < 3: return fila * 3 + col
         return None
-    def cerrar(self): pygame.quit(); sys.exit()
+
+    def cerrar(self):
+        pygame.quit(); sys.exit()
