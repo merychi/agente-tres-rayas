@@ -2,7 +2,7 @@
 import time
 from game.logic import LogicaTresRayas
 # Importamos el nuevo generador de árbol
-from game.ai import ia_decidir_movimiento, generar_arbol_juego 
+from game.ai import ia_decidir_movimiento, generar_arbol_combinado
 from ui.interface import InterfazGrafica
 
 def main():
@@ -14,10 +14,11 @@ def main():
     juego_corriendo = True
     juego_terminado_flag = False
     
-    # Esta variable ahora guardará la estructura jerárquica
+    # Ahora la raíz del grafo será un tablero vacío (siempre 9 hijos)
+    tablero_raiz_grafo = [" " for _ in range(9)]
     estructura_arbol = [] 
-    tablero_raiz_grafo = list(juego.tablero)
 
+    # Nota: comenzamos con que la IA juega primero (X) — como en tu diseño original
     while juego_corriendo:
         
         # 1. DIBUJAR (Pasamos la estructura compleja)
@@ -36,11 +37,12 @@ def main():
             turno = "X"
             mensaje_estado = "Juega la IA (X)"
             estructura_arbol = []
-            tablero_raiz_grafo = list(juego.tablero)
+            tablero_raiz_grafo = [" " for _ in range(9)]
             juego_terminado_flag = False
             continue
 
-        if juego_terminado_flag: continue
+        if juego_terminado_flag: 
+            continue
 
         if juego.juego_terminado():
             ganador = juego.verificar_ganador()
@@ -61,16 +63,19 @@ def main():
             # IA Juega
             movimiento, _ = ia_decidir_movimiento(juego.tablero)
             
-            if juego.realizar_movimiento(movimiento, "X"):
+            if movimiento is None:
+                # No hay movimiento posible
                 turno = "O"
                 mensaje_estado = "Tu turno"
-                
-                # --- GENERACIÓN DEL ÁRBOL JERÁRQUICO ---
-                # Una vez la IA movió, generamos el árbol:
-                # Nivel 1: Tus opciones ('O')
-                # Nivel 2: La reacción de la IA ('X')
-                tablero_raiz_grafo = list(juego.tablero)
-                estructura_arbol = generar_arbol_juego(juego.tablero)
+            else:
+                if juego.realizar_movimiento(movimiento, "X"):
+                    turno = "O"
+                    mensaje_estado = "Tu turno"
+                    
+                    # --- GENERACIÓN DEL ÁRBOL JERÁRQUICO ---
+                    # Generamos la estructura combinada:
+                    estructura_arbol = generar_arbol_combinado(juego.tablero)
+                    # tablero_raiz_grafo se mantiene como tablero vacío para mostrar siempre 9 hijos
 
         else:
             # --- HUMANO ---
