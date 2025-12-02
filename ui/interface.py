@@ -31,6 +31,9 @@ class InterfazGrafica:
         self.pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
         pygame.display.set_caption("Tres en Raya - Minimax")
 
+        self.fade_cache = {}   # id_nodo -> opacidad_actual
+        self.fade_speed = 12   # velocidad de aparición (más grande = más rápido) 
+
         # Fuentes
         self.fuente_titulo = pygame.font.SysFont("Arial", 28, bold=True)
         self.fuente_ficha = pygame.font.SysFont("Arial", 60, bold=True)
@@ -60,38 +63,59 @@ class InterfazGrafica:
     # -------------------------------------------------------------------------
     # MINI TABLERO
     # -------------------------------------------------------------------------
-    def dibujar_mini_tablero(self, x, y, tablero_data, tamano, puntaje=None):
+
+    def dibujar_mini_tablero(self, x, y, tablero_data, tamano, puntaje=None, nodo_id=None):
+        """
+        Mini-tablero con animación fade-in (requiere nodo_id único).
+        """
         padding = 2
         ancho_total = (tamano * 3) + (padding * 4)
 
-        # Borde por puntaje
+        # --- Animación fade-in ---
+        if nodo_id not in self.fade_cache:
+            self.fade_cache[nodo_id] = 0  # empieza invisible
+
+        alpha = self.fade_cache[nodo_id]
+        alpha = min(alpha + self.fade_speed, 255)
+        self.fade_cache[nodo_id] = alpha
+
+        # Dibujamos en surface temporal con alpha
+        surf = pygame.Surface((ancho_total, ancho_total), pygame.SRCALPHA)
+        
+        # Color por puntaje
         color_borde = COLOR_TABLERO
         if puntaje is not None:
             if puntaje > 0: color_borde = "#33ff33"
             elif puntaje < 0: color_borde = "#ff3333"
             else: color_borde = "#cccccc"
 
-        pygame.draw.rect(self.pantalla, color_borde,
-                         (x, y, ancho_total, ancho_total), border_radius=4)
-        pygame.draw.rect(self.pantalla, COLOR_TABLERO,
-                         (x + 2, y + 2, ancho_total - 4, ancho_total - 4), border_radius=4)
+        pygame.draw.rect(surf, color_borde,
+                         (0, 0, ancho_total, ancho_total), border_radius=4)
+        pygame.draw.rect(surf, COLOR_TABLERO,
+                        (2, 2, ancho_total - 4, ancho_total - 4), border_radius=4)
 
         for i in range(9):
             fila = i // 3
             col = i % 3
-            px = x + padding + col * (tamano + padding)
-            py = y + padding + fila * (tamano + padding)
+            px = padding + col * (tamano + padding)
+            py = padding + fila * (tamano + padding)
 
-            pygame.draw.rect(self.pantalla, COLOR_CASILLA,
+            pygame.draw.rect(surf, COLOR_CASILLA,
                              (px, py, tamano, tamano), border_radius=2)
 
             if tablero_data[i] != " ":
                 color = COLOR_X if tablero_data[i] == "X" else COLOR_O
                 txt = self.fuente_mini.render(tablero_data[i], True, color)
-                rect = txt.get_rect(center=(px + tamano/2, py + tamano/2))
-                self.pantalla.blit(txt, rect)
+                surf.blit(txt, txt.get_rect(center=(px + tamano/2, py + tamano/2)))
+
+        # Aplicar opacidad
+        surf.set_alpha(alpha)
+
+        # Dibujar en pantalla
+        self.pantalla.blit(surf, (x, y))
 
         return (x + ancho_total // 2, y + ancho_total)
+
 
 
     # -------------------------------------------------------------------------
@@ -140,9 +164,13 @@ class InterfazGrafica:
                                  punto_conexion_top, 2)
 
             # Mini tablero
+            nodo_id = id(nodo)   # identificador único
             punto_conexion_bottom = self.dibujar_mini_tablero(
-                pos_x, pos_y, nodo["tablero"], TAMANO_MINI, nodo["puntaje"]
-            )
+            pos_x, pos_y,
+            nodo["tablero"], TAMANO_MINI,
+            nodo["puntaje"],
+            nodo_id
+        )
 
             # Puntaje
             p_val = nodo["puntaje"]
@@ -209,7 +237,9 @@ class InterfazGrafica:
             centro_arbol_x - ancho_nodo//2 + self.scroll_x,
             100 + self.scroll_y,
             tablero_a_usar,
-            TAMANO_MINI
+            TAMANO_MINI,
+            puntaje=0,
+            nodo_id="ROOT"
         )
 
         # Árbol completo
@@ -225,7 +255,7 @@ class InterfazGrafica:
 
 
     # -------------------------------------------------------------------------
-    # EVENTOS (scroll vertical y horizontal)
+    # EVENTOS (scroll  con mouse y clics del usuario)
     # -------------------------------------------------------------------------
     def obtener_evento_usuario(self):
 
@@ -245,20 +275,6 @@ class InterfazGrafica:
                     self.scroll_y += evento.y * self.scroll_velocidad
 
                 # Ajustar límites
-                self.scroll_x = max(self.scroll_x_min, min(self.scroll_x_max, self.scroll_x))
-                self.scroll_y = max(self.scroll_y_min, min(self.scroll_y_max, self.scroll_y))
-
-            # ------------------ FLECHAS TECLADO ------------------
-            if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_UP:
-                    self.scroll_y += self.scroll_velocidad
-                if evento.key == pygame.K_DOWN:
-                    self.scroll_y -= self.scroll_velocidad
-                if evento.key == pygame.K_LEFT:
-                    self.scroll_x += self.scroll_velocidad
-                if evento.key == pygame.K_RIGHT:
-                    self.scroll_x -= self.scroll_velocidad
-
                 self.scroll_x = max(self.scroll_x_min, min(self.scroll_x_max, self.scroll_x))
                 self.scroll_y = max(self.scroll_y_min, min(self.scroll_y_max, self.scroll_y))
 
