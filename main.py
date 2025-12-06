@@ -1,67 +1,94 @@
 # main.py
-# Punto de entrada principal para la versión de consola del juego.
-
+import time
 from game.logic import LogicaTresRayas
-# Importamos la función que conecta con el algoritmo Minimax
-from game.ai import ia_decidir_movimiento 
-
-def imprimir_tablero(tablero):
-    print("\n")
-    print(f"  {tablero[0]} | {tablero[1]} | {tablero[2]} ")
-    print(" ---+---+---")
-    print(f"  {tablero[3]} | {tablero[4]} | {tablero[5]} ")
-    print(" ---+---+---")
-    print(f"  {tablero[6]} | {tablero[7]} | {tablero[8]} ")
-    print("\n")
-
+# Importamos el nuevo generador de árbol
+from game.ai import ia_decidir_movimiento, generar_arbol_combinado
+from ui.interface import InterfazGrafica
 
 def main():
     juego = LogicaTresRayas()
-    print("--- Tres en raya (modo consola) ---")
-    print("Instrucciones: Escribe el número de la casilla (0-8)")
+    ui = InterfazGrafica()
     
-    # Configuración inicial: Asignamos roles fijos para esta prueba.
-    turno = "X"  # La IA será 'X' (Maximizado) y el Humano 'O' (Minimizado)
+    turno = "X"
+    mensaje_estado = "Juega la IA (X)"
+    juego_corriendo = True
+    juego_terminado_flag = False
+    
+    # Ahora la raíz del grafo será un tablero vacío (siempre 9 hijos)
+    tablero_raiz_grafo = [" " for _ in range(9)]
+    estructura_arbol = [] 
 
-    while not juego.juego_terminado():
-        print(f"Turno actual: {turno}")
-        imprimir_tablero(juego.tablero)
+    # Nota: comenzamos con que la IA juega primero (X) — como en tu diseño original
+    while juego_corriendo:
+        
+        # 1. DIBUJAR (Pasamos la estructura compleja)
+        ui.dibujar_interfaz(juego.tablero, mensaje_estado, 
+                            tablero_raiz=tablero_raiz_grafo, 
+                            estructura_arbol=estructura_arbol)
 
-        # --- BLOQUE DE DECISIÓN DE TURNO ---
+        # 2. EVENTOS
+        evento = ui.obtener_evento_usuario()
+
+        if evento == 'SALIR':
+            juego_corriendo = False; break
+        
+        if evento == 'REINICIAR':
+            juego.reiniciar()
+            turno = "X"
+            mensaje_estado = "Juega la IA (X)"
+            estructura_arbol = []
+            tablero_raiz_grafo = [" " for _ in range(9)]
+            juego_terminado_flag = False
+            continue
+
+        if juego_terminado_flag: 
+            continue
+
+        if juego.juego_terminado():
+            ganador = juego.verificar_ganador()
+            mensaje_estado = f"¡Ganó {ganador}!" if ganador else "¡Empate!"
+            estructura_arbol = [] # Limpiamos al final
+            juego_terminado_flag = True
+            continue
+
+        # 3. TURNOS
         if turno == "X":
-            # Turno de la IA (Automático)
-            print("La IA está pensando...")
-            
-            # Llamada al cerebro de la IA (Minimax).
-            # La función retorna una tupla: (mejor_movimiento, datos_para_graficar).
-            # Usamos la variable '_' para descartar los datos del gráfico, 
-            # ya que en la consola solo necesitamos el movimiento.
+            # --- IA ---
+            mensaje_estado = "Pensando..."
+            ui.dibujar_interfaz(juego.tablero, mensaje_estado, 
+                                tablero_raiz=tablero_raiz_grafo,
+                                estructura_arbol=estructura_arbol)
+            time.sleep(0.3) 
+
+            # IA Juega
             movimiento, _ = ia_decidir_movimiento(juego.tablero)
             
-            print(f"La IA (X) elige la casilla: {movimiento}")
-        else:
-            # Turno del Humano (Manual)
-            try:
-                entrada = input(f"Jugador {turno}, elige casilla (0-8): ")
-                movimiento = int(entrada)
-            except ValueError:
-                print("ERROR: Debes escribir solo un número entero.")
-                continue
+            if movimiento is None:
+                # No hay movimiento posible
+                turno = "O"
+                mensaje_estado = "Tu turno"
+            else:
+                if juego.realizar_movimiento(movimiento, "X"):
+                    turno = "O"
+                    mensaje_estado = "Tu turno"
+                    
+                    # --- GENERACIÓN DEL ÁRBOL JERÁRQUICO ---
+                    # Generamos la estructura combinada:
+                    estructura_arbol = generar_arbol_combinado(juego.tablero)
+                    # tablero_raiz_grafo se mantiene como tablero vacío para mostrar siempre 9 hijos
 
-        # --- EJECUCIÓN DEL MOVIMIENTO ---
-        if juego.realizar_movimiento(movimiento, turno):
-            # Si el movimiento fue válido, cambiamos de turno
-            turno = "O" if turno == "X" else "X"
         else:
-            print("Casilla ocupada o número inválido (debe ser 0-8).")
+            # --- HUMANO ---
+            if isinstance(evento, int): 
+                movimiento = evento
+                if juego.es_movimiento_valido(movimiento):
+                    juego.realizar_movimiento(movimiento, "O")
+                    turno = "X"
+                    # No borramos el árbol para que se vea hasta que la IA piense de nuevo
+                else:
+                    mensaje_estado = "¡Casilla ocupada!"
 
-    # --- FIN DEL JUEGO ---
-    print("\n--- Juego terminado ---")
-    imprimir_tablero(juego.tablero)
-    ganador = juego.verificar_ganador()
-    
-    # Mostramos el resultado final
-    print("GANADOR:", ganador if ganador else "Empate")
+    ui.cerrar()
 
 if __name__ == "__main__":
     main()
