@@ -14,8 +14,10 @@ class InterfazGrafica:
     def __init__(self):
         pygame.init()
         pygame.font.init()
+        pygame.mixer.init()
         self.pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
         pygame.display.set_caption("Tres en Raya - Minimax")
+        
 
         # --- Fade / animaciones ---
         self.fade_cache = {}           # id_nodo -> alpha
@@ -44,8 +46,10 @@ class InterfazGrafica:
         self.modal_scroll_y = 0
         self.modal_scroll_vel = 40
 
-        # Fuentes
+        # Fuentes y sonido
         self.fuentes = cargar_fuentes()
+        self.sonidos = cargar_sonidos()
+        iniciar_musica_fondo()
 
         # Layout tablero
         self.centro_izq = ANCHO_VENTANA * 0.25
@@ -207,11 +211,15 @@ class InterfazGrafica:
         
         pygame.draw.rect(self.pantalla, pygame.Color(COLOR_TABLERO), fondo_rect, border_radius=45)
 
-
+        jugada_detectada = False
         # DETECTAR CAMBIOS
         for i in range(9):
             if self.tablero_previo[i] == " " and tablero[i] != " ":
                 self.animaciones_fichas[i] = 0 
+                jugada_detectada = True
+
+        if jugada_detectada and 'colocar' in self.sonidos:
+            self.sonidos['colocar'].play()        
         
         self.tablero_previo = list(tablero)
 

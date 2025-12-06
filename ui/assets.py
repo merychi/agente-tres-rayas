@@ -29,3 +29,48 @@ def cargar_fuentes():
         fuentes['ui'] = pygame.font.SysFont("Arial", 14)
     
     return fuentes
+
+def cargar_sonidos():
+    """
+    Carga los efectos de sonido del juego.
+    """
+    sonidos = {}
+    
+    ruta_sfx = os.path.join(os.path.dirname(__file__), '..', 'assets', 'plop.wav')
+
+    try:
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+            
+        sonidos['colocar'] = pygame.mixer.Sound(ruta_sfx)
+        # Puedes ajustar el volumen si quieres (0.0 a 1.0)
+        sonidos['colocar'].set_volume(0.3) 
+        
+    except (FileNotFoundError, pygame.error) as e:
+        print(f"AVISO: No se pudo cargar el sonido: {e}")
+    
+    return sonidos
+
+def iniciar_musica_fondo():
+    """
+    Carga y reproduce la música de fondo en bucle infinito.
+    """
+    ruta_musica = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fondo.mp3')
+
+    try:
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+
+        # Cargar la música (Stream)
+        pygame.mixer.music.load(ruta_musica)
+        
+        # Volumen bajo para que no moleste (0.0 a 1.0)
+        pygame.mixer.music.set_volume(0.1) 
+        
+        # Reproducir en bucle infinito (-1 significa loops infinitos)
+        pygame.mixer.music.play(-1)
+        
+        print("Música de fondo iniciada.")
+        
+    except (FileNotFoundError, pygame.error) as e:
+        print(f"AVISO: No se pudo cargar la música: {e}")
