@@ -49,7 +49,14 @@ class InterfazGrafica:
         # Fuentes y sonido
         self.fuentes = cargar_fuentes()
         self.sonidos = cargar_sonidos()
-        iniciar_musica_fondo()
+
+        ruta_fondo = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fondo_tablero.png')
+        try:
+            self.fondo_juego = pygame.image.load(ruta_fondo)
+            self.fondo_juego = pygame.transform.scale(self.fondo_juego, (ANCHO_VENTANA, ALTO_VENTANA))
+        except FileNotFoundError:
+            print("AVISO: No se encontró fondo_juego.png. Usando color sólido.")
+            self.fondo_juego = None
 
         # Layout tablero
         self.centro_izq = ANCHO_VENTANA * 0.25
@@ -69,6 +76,10 @@ class InterfazGrafica:
         # Boton ver arbol
         self.rect_boton_arbol = pygame.Rect(0, 0, 220, 50)
         self.rect_boton_arbol.center = (self.centro_der, ALTO_VENTANA - 80)
+
+        #Botón salir
+        self.rect_boton_salir = pygame.Rect(0, 0, 140, 50)
+        self.rect_boton_salir.bottomright = (ANCHO_VENTANA - 30, ALTO_VENTANA - 30)
 
         # Camino real ancho fijo
         self.ancho_camino = 220
@@ -133,8 +144,8 @@ class InterfazGrafica:
             p_val = nodo.get("puntaje")
             if p_val is not None:
                 col_p = pygame.Color("#ccffcc") if p_val > 0 else (pygame.Color("#ffcccc") if p_val < 0 else pygame.Color("#ffffff"))
-                self.pantalla.blit(self.fuentes['ui'].render(str(p_val), True, col_p),
-                                   (pos_x + ancho_nodo_px + 3, pos_y + 10))
+                lbl_puntaje = self.fuentes['numeros'].render(str(p_val), True, col_p)
+                self.pantalla.blit(lbl_puntaje, (pos_x + ancho_nodo_px + 3, pos_y + 10))
 
             if nodo.get("sub_ramas"):
                 ancho_virtual = 4000 
@@ -184,15 +195,19 @@ class InterfazGrafica:
     # DIBUJAR INTERFAZ (principal)
     # ------------------------------
     def dibujar_interfaz(self, tablero, mensaje, tablero_raiz=None, estructura_arbol=None, camino_real=None):
-        self.pantalla.fill(pygame.Color(COLOR_FONDO))
         """
         dibujar_interfaz ahora acepta camino_real (lista de nodos) además del árbol.
         """
+        if self.fondo_juego:
+            self.pantalla.blit(self.fondo_juego, (0, 0))
+        else:
+            self.pantalla.fill(pygame.Color(COLOR_FONDO))
+
         mouse_pos = pygame.mouse.get_pos()
 
                 # --- SECCIÓN IZQUIERDA ---
         # Titulo
-        t_tablero = self.fuentes['titulo'].render("Tablero del juego", True, pygame.Color(COLOR_BOTON))
+        t_tablero = self.fuentes['titulo'].render("TABLERO DEL JUEGO", True, pygame.Color(COLOR_BOTON))
         self.pantalla.blit(t_tablero, t_tablero.get_rect(center=(self.centro_izq, 80)))
         
         # Subtitulo 
@@ -258,14 +273,10 @@ class InterfazGrafica:
                 self.pantalla.blit(txt, rect_texto)
 
         # BOTÓN Nueva partida
-        mouse_pos = pygame.mouse.get_pos()
-        color_btn = pygame.Color(COLOR_BOTON_HOVER) if self.rect_boton.collidepoint(mouse_pos) else pygame.Color(COLOR_BOTON)
-        pygame.draw.rect(self.pantalla, color_btn, self.rect_boton, border_radius=15)
-        txt_btn = self.fuentes['boton'].render("Nuevo Juego", True, pygame.Color(COLOR_TEXTO))
-        self.pantalla.blit(txt_btn, txt_btn.get_rect(center=self.rect_boton.center))
+        self.dibujar_boton_redondo(self.rect_boton, "Nuevo Juego")
 
         # --- SECCIÓN DERECHA ---
-        t_agente = self.fuentes['titulo'].render("Decisiones del Agente", True, pygame.Color(COLOR_BOTON))
+        t_agente = self.fuentes['subtitulo'].render("Decisiones del Agente", True, pygame.Color(COLOR_BOTON))
         self.pantalla.blit(t_agente, t_agente.get_rect(center=(self.centro_der, 80)))
 
         altura_clip = ALTO_VENTANA - 140 - 140 
@@ -295,11 +306,9 @@ class InterfazGrafica:
         self.pantalla.set_clip(None)
 
         # Botón Ver Árbol Completo
-        color_bm = pygame.Color(COLOR_BOTON_HOVER) if self.rect_boton_arbol.collidepoint(mouse_pos) else pygame.Color(COLOR_BOTON)
-        
-        pygame.draw.rect(self.pantalla, color_bm, self.rect_boton_arbol, border_radius=15)
-        txt_bm = self.fuentes['boton'].render("Ver árbol completo", True, pygame.Color(COLOR_TEXTO))
-        self.pantalla.blit(txt_bm, txt_bm.get_rect(center=self.rect_boton_arbol.center))
+        self.dibujar_boton_redondo(self.rect_boton_arbol, "Ver árbol completo")
+        self.dibujar_boton_redondo(self.rect_boton_salir, "Salir")
+
 
         # --- MODAL (Overlay) ---
         if self.modal_abierto:
@@ -327,10 +336,12 @@ class InterfazGrafica:
         titulo_rect = titulo.get_rect(center=(caja.centerx, caja.y + 25))
         self.pantalla.blit(titulo, titulo_rect)
         
-        btn_cerrar = pygame.Rect(caja.right - 110, caja.y + 10, 90, 36)
+        btn_cerrar = pygame.Rect(caja.right - 160, caja.y + 10, 140, 50)
         color_btn = pygame.Color(COLOR_BOTON_HOVER) if btn_cerrar.collidepoint(pygame.mouse.get_pos()) else pygame.Color(COLOR_BOTON)
-        pygame.draw.rect(self.pantalla, color_btn, btn_cerrar, border_radius=8)
-        self.pantalla.blit(self.fuentes['ui'].render("Cerrar (Esc)", True, pygame.Color(COLOR_TEXTO)), (btn_cerrar.x + 10, btn_cerrar.y + 8))
+        pygame.draw.rect(self.pantalla, color_btn, btn_cerrar, border_radius=12)   
+        txt_cerrar = self.fuentes['ui'].render("Cerrar (Esc)", True, pygame.Color(COLOR_TEXTO))
+        rect_txt = txt_cerrar.get_rect(center=btn_cerrar.center) 
+        self.pantalla.blit(txt_cerrar, rect_txt)     
 
         # Área interna
         inner_x = caja.x + 20
@@ -373,6 +384,32 @@ class InterfazGrafica:
         # Le pasamos 'self' para que la función externa pueda modificar
         # los atributos de esta clase (scrolls, flags, etc.)
         return manejar_eventos(self)
+    
+    def dibujar_boton_redondo(self, rect, texto):
+        """Dibuja un botón estilo menú pero adaptado a la interfaz"""
+        mouse_pos = pygame.mouse.get_pos()
+        es_hover = rect.collidepoint(mouse_pos)
+        
+        color_base = (44, 44, 84)
+        color_hover = (70, 70, 130)
+        color_sombra = (79, 87, 175)
+        
+        color_actual = color_hover if es_hover else color_base
+        
+        elevacion = 4 if es_hover else 0
+        
+        rect_sombra = rect.copy()
+        rect_sombra.y += 6 
+        pygame.draw.rect(self.pantalla, color_sombra, rect_sombra, border_radius=25)
+        
+        # 2. Botón Visual
+        rect_visual = rect.copy()
+        rect_visual.y -= elevacion
+        pygame.draw.rect(self.pantalla, color_actual, rect_visual, border_radius=25)
+        
+        txt_surf = self.fuentes['boton'].render(texto, True, (255, 255, 255))
+        txt_rect = txt_surf.get_rect(center=rect_visual.center)
+        self.pantalla.blit(txt_surf, txt_rect)
 
     # ------------------------------
     # cerrar

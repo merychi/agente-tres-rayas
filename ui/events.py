@@ -113,6 +113,9 @@ def manejar_eventos(ui):
                 ui.modal_scroll_x = 0
                 ui.modal_scroll_y = 0
                 return None
+            
+            if hasattr(ui, 'rect_boton_salir') and ui.rect_boton_salir.collidepoint(mx, my):
+                    return 'SALIR'
 
             # Clic en tablero principal
             if (ui.inicio_x < mx < ui.inicio_x + ui.ancho_juego and

@@ -1,12 +1,47 @@
 # main.py
 import time
+import sys
+import pygame 
+
 from game.logic import LogicaTresRayas
-# Importamos el nuevo generador de árbol
 from game.ai import ia_decidir_movimiento, reconstruir_camino_real, generar_arbol_rama, generar_arbol_con_camino_resaltado, limpiar_cache 
-from ui.interface import InterfazGrafica
+from ui.interface import *
+from ui.menu import MenuPrincipal
+from ui.config import * 
+from ui.assets import iniciar_musica_fondo 
 
 def main():
+    pygame.init()
+    pygame.mixer.init()
+    
+    iniciar_musica_fondo()
+    
+    # Creamos la ventana para el menú
+    pantalla_principal = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
+    pygame.display.set_caption("Tres en Raya - Minimax")
+
+    # --- FASE 1: BUCLE DEL MENÚ ---
+    menu = MenuPrincipal(pantalla_principal)
+    en_menu = True
+    clock_menu = pygame.time.Clock()
+
+    while en_menu:
+        clock_menu.tick(60)
+        
+        # Dibujar y lógica del menú
+        accion = menu.manejar_eventos()
+        menu.actualizar()
+
+        if accion == "SALIR":
+            pygame.quit()
+            sys.exit()
+        elif accion == "JUGAR":
+            en_menu = False # Rompemos el bucle y pasamos al juego
+        elif accion == "AYUDA":
+            print("Aquí iría la pantalla de tutorial")     
+    
     juego = LogicaTresRayas()
+    
     ui = InterfazGrafica()
     
     turno = "X"
@@ -90,10 +125,8 @@ def main():
                     mensaje_estado = "Tu turno"
                     
                     # --- GENERACIÓN DEL ÁRBOL JERÁRQUICO ---
-                    # Generamos la estructura combinada:
                     estructura_arbol = generar_arbol_con_camino_resaltado(juego.tablero)   # solo la rama jugada
                     camino_real = reconstruir_camino_real(juego.tablero)
-                    # tablero_raiz_grafo se mantiene como tablero vacío para mostrar siempre 9 hijos
 
         else:
             # --- HUMANO ---
@@ -102,7 +135,6 @@ def main():
                 if juego.es_movimiento_valido(movimiento):
                     juego.realizar_movimiento(movimiento, "O")
                     turno = "X"
-                    # No borramos el árbol para que se vea hasta que la IA piense de nuevo
                 else:
                     mensaje_estado = "¡Casilla ocupada!"
 
