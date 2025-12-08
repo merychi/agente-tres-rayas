@@ -2,10 +2,22 @@
 from game.logic import LogicaTresRayas
 from copy import deepcopy
 
+# --- MEMORIA GLOBAL (CACHE) ---
+CACHE_MINIMAX = {}
+
+def limpiar_cache():
+    """Limpia la memoria para reiniciar partida"""
+    CACHE_MINIMAX.clear()
+
 def minimax(tablero, profundidad, es_turno_max):
     """
     Función recursiva que simula todos los posibles juegos futuros.
     """
+    estado_clave = (tuple(tablero), es_turno_max)
+    if estado_clave in CACHE_MINIMAX:
+        puntaje_base = CACHE_MINIMAX[estado_clave]
+        return puntaje_base
+
     juego = LogicaTresRayas()
     juego.tablero = list(tablero)
     ganador = juego.verificar_ganador()
@@ -24,6 +36,8 @@ def minimax(tablero, profundidad, es_turno_max):
             puntaje = minimax(juego.tablero, profundidad + 1, False)
             juego.tablero[movimiento] = " "
             mejor_puntaje = max(mejor_puntaje, puntaje)
+        
+        CACHE_MINIMAX[estado_clave] = mejor_puntaje
         return mejor_puntaje
     else:
         mejor_puntaje = float('inf')
@@ -32,6 +46,8 @@ def minimax(tablero, profundidad, es_turno_max):
             puntaje = minimax(juego.tablero, profundidad + 1, True)
             juego.tablero[movimiento] = " "
             mejor_puntaje = min(mejor_puntaje, puntaje)
+        
+        CACHE_MINIMAX[estado_clave] = mejor_puntaje
         return mejor_puntaje
 
 def ia_decidir_movimiento(tablero):
@@ -51,7 +67,7 @@ def ia_decidir_movimiento(tablero):
     return mejor_movimiento, datos_grafico
 
 # -------------------------
-# Funciones nuevas para mostrar raíz fija + camino real
+# Funciones para mostrar raíz fija + camino real
 # -------------------------
 
 def generar_arbol_inicial():
@@ -91,7 +107,7 @@ def reconstruir_camino_real(tablero_actual, profundidad_max=8):
     jugadas se alternan X (IA) -> O (humano) -> X -> ...
     Devuelve una lista de nodos en orden (tableros después de cada jugada).
     """
-    # Copia para no modificar original
+
     objetivo = list(tablero_actual)
     tablero_sim = [" " for _ in range(9)]
     camino_nodos = []
@@ -131,6 +147,22 @@ def reconstruir_camino_real(tablero_actual, profundidad_max=8):
         camino_nodos.append(nodo)
 
     return camino_nodos
+
+def generar_arbol_rama(tablero_actual):
+    """
+    Convierte la lista plana de reconstruir_camino_real
+    en una cadena de nodos para que se vea como árbol.
+    Devuelve [raíz] con sub_ramas = [siguiente] → cadena simple.
+    """
+    camino = reconstruir_camino_real(tablero_actual)  # lista plana
+    if not camino:
+        return []
+
+    # encadenamos
+    for i in range(len(camino) - 1):
+        camino[i]["sub_ramas"] = [camino[i + 1]]
+    camino[-1]["sub_ramas"] = []  # último sin hijos
+    return [camino[0]]            # lista con la raíz
 
 def generar_arbol_combinado(tablero_actual, profundidad_camino=8):
     """
@@ -203,3 +235,70 @@ def generar_arbol_combinado(tablero_actual, profundidad_camino=8):
     hijo_objetivo["sub_ramas"] = sub_actual
 
     return raiz["sub_ramas"]
+
+
+def generar_arbol_con_camino_resaltado(tablero_final):
+    """
+    Reconstruye el juego paso a paso. En cada paso:
+    1. Genera TODOS los hijos posibles (opciones que tuvo la IA o el jugador).
+    2. Identifica cuál fue la jugada real.
+    3. Marca la jugada real con 'es_camino': True.
+    4. Solo expande (recursion) el nodo de la jugada real.
+    """
+    secuencia_movimientos = []
+    tablero_temp = [" "]*9
+    copia_final = list(tablero_final)
+    total_fichas = sum(1 for c in copia_final if c != " ")
+    
+    for _ in range(total_fichas):
+        turno_actual = "X" if len(secuencia_movimientos) % 2 == 0 else "O"
+        movimiento_encontrado = None
+        for i in range(9):
+            if copia_final[i] == turno_actual and tablero_temp[i] == " ":
+                movimiento_encontrado = i
+                break
+        if movimiento_encontrado is not None:
+            secuencia_movimientos.append((movimiento_encontrado, turno_actual))
+            tablero_temp[movimiento_encontrado] = turno_actual
+        else:
+            break
+
+    # 2. Construir árbol
+    tablero_simulado = [" "]*9
+    raiz_ficticia = {"sub_ramas": []}
+    nodo_actual = raiz_ficticia
+    
+    for paso_idx, (mov_real, turno) in enumerate(secuencia_movimientos):
+        hijos_nivel = []
+        movimientos_posibles = [i for i, c in enumerate(tablero_simulado) if c == " "]
+        
+        nodo_siguiente_camino = None
+
+        for mov in movimientos_posibles:
+            t_futuro = list(tablero_simulado)
+            t_futuro[mov] = turno
+            
+            # AQUÍ es donde el CACHE hace la magia de velocidad
+            puntaje = minimax(t_futuro, 0, (turno == "O"))
+            
+            es_real = (mov == mov_real)
+            
+            nuevo_nodo = {
+                "tablero": t_futuro,
+                "puntaje": puntaje,
+                "es_turno_ia": (turno == "X"),
+                "es_camino": es_real,
+                "sub_ramas": []
+            }
+            hijos_nivel.append(nuevo_nodo)
+            
+            if es_real:
+                nodo_siguiente_camino = nuevo_nodo
+        
+        nodo_actual["sub_ramas"] = hijos_nivel
+        nodo_actual = nodo_siguiente_camino
+        tablero_simulado[mov_real] = turno
+        
+        if not nodo_actual: break 
+        
+    return raiz_ficticia["sub_ramas"]
