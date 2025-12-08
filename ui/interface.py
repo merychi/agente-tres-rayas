@@ -1,4 +1,3 @@
-# ui/interface.py
 import pygame
 import sys
 import os
@@ -18,7 +17,6 @@ class InterfazGrafica:
         self.pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
         pygame.display.set_caption("Tres en Raya - Minimax")
         
-
         # --- Fade / animaciones ---
         self.fade_cache = {}           # id_nodo -> alpha
         self.fade_speed = 12           # incremento alpha por frame
@@ -69,15 +67,13 @@ class InterfazGrafica:
         punto_medio_vertical = (y_arriba + y_abajo) / 2
         self.inicio_y = int(punto_medio_vertical - (self.ancho_juego / 2))
 
-        # Boton reiniciar
+        # Botones
         self.rect_boton = pygame.Rect(0, 0, 200, 50)
         self.rect_boton.center = (self.centro_izq, ALTO_VENTANA - 80)
 
-        # Boton ver arbol
         self.rect_boton_arbol = pygame.Rect(0, 0, 220, 50)
         self.rect_boton_arbol.center = (self.centro_der, ALTO_VENTANA - 80)
 
-        #Botón salir
         self.rect_boton_salir = pygame.Rect(0, 0, 140, 50)
         self.rect_boton_salir.bottomright = (ANCHO_VENTANA - 30, ALTO_VENTANA - 30)
 
@@ -89,6 +85,55 @@ class InterfazGrafica:
 
         self.tablero_previo = [" "] * 9  # Para comparar y detectar jugadas
         self.animaciones_fichas = {}     # Diccionario {indice: escala_actual}
+
+    # ------------------------------
+    # AUXILIAR: Extraer camino lineal del árbol
+    # ------------------------------
+    def _extraer_camino_lineal(self, arbol):
+        """
+        Recorre la estructura de árbol buscando los nodos marcados como 'es_camino_ganador'
+        para reconstruir la lista lineal que se muestra a la derecha.
+        """
+        camino = []
+        if not arbol:
+            return camino
+        
+        # En el primer nivel (hermanos), buscamos el ganador
+        nodo_actual = None
+        for nodo in arbol:
+            if nodo.get("es_camino_ganador"):
+                nodo_actual = nodo
+                break
+        
+        # Si no hay ganador marcado en la raíz, tomamos el primero (fallback)
+        if not nodo_actual and arbol:
+            nodo_actual = arbol[0]
+
+        # Recorrer hacia abajo
+        while nodo_actual:
+            camino.append(nodo_actual)
+            
+            # Buscar el siguiente en las sub_ramas
+            siguiente = None
+            if nodo_actual.get("sub_ramas"):
+                for hijo in nodo_actual["sub_ramas"]:
+                    if hijo.get("es_camino_ganador"):
+                        siguiente = hijo
+                        break
+                # Si no encontramos uno marcado, tomamos el primero (fallback visual)
+                if not siguiente and nodo_actual["sub_ramas"]:
+                    siguiente = nodo_actual["sub_ramas"][0]
+            
+            nodo_actual = siguiente
+            
+        return camino
+
+    def _es_turno_ia(self, tablero):
+        """Deduce de quién fue el turno basado en el conteo de fichas."""
+        x_count = tablero.count("X")
+        o_count = tablero.count("O")
+        # Si hay más X que O, el último movimiento fue X (IA)
+        return x_count > o_count
 
     # ------------------------------
     # ÁRBOL recursivo (usa scroll_x, scroll_y)
@@ -125,7 +170,8 @@ class InterfazGrafica:
                 pygame.draw.line(self.pantalla, pygame.Color(COLOR_LINEA), (padre_x, mid_y), (hijo_x, mid_y), 2)
                 pygame.draw.line(self.pantalla, pygame.Color(COLOR_LINEA), (hijo_x, mid_y), (hijo_x, hijo_y), 2)
                 
-            es_camino = nodo.get("es_camino", False)
+            # Determinar si es camino ganador para resaltarlo
+            es_camino = nodo.get("es_camino_ganador", False)
             nodo_id = id(nodo)
             
             punto_conexion_bottom = dibujar_mini_tablero(
@@ -156,61 +202,62 @@ class InterfazGrafica:
                     y_nivel + ESPACIO_VERTICAL_ARBOL, 
                     punto_conexion_bottom
                 )
+
     # ------------------------------
     # CAMINO REAL (columna con scroll propio)
     # ------------------------------
     def dibujar_camino_real(self, camino_real, x_inicio, y_inicio):
         """
         Dibuja la columna del CAMINO REAL con scroll independiente.
-        Cada nodo muestra: etiqueta (MAX/MIN), puntaje y mini-tablero con fade.
+        Solo muestra la etiqueta de turno y el mini-tablero, sin puntaje.
         """
         if not camino_real:
             return
+        
         y = y_inicio + self.scroll_camino
+        
         for depth, nodo in enumerate(camino_real):
-            # etiqueta MAX/MIN
-            turno = "MAX (X)" if nodo["es_turno_ia"] else "MIN (O)"
-            color = (180, 220, 255) if nodo["es_turno_ia"] else (255, 200, 220)
+            # Deducir turno
+            es_turno_ia = self._es_turno_ia(nodo["tablero"])
+            turno = "IA" if es_turno_ia else "Humano"
+            color = (255, 255, 255) if es_turno_ia else (255, 255, 255)
+            
             self.pantalla.blit(self.fuentes['ui'].render(turno, True, color), (x_inicio, y))
             y += 20
 
-            p = nodo.get("puntaje", 0)
-            col_p = pygame.Color("#ccffcc") if p > 0 else (pygame.Color("#ffcccc") if p < 0 else pygame.Color("#ffffff"))
-            self.pantalla.blit(self.fuentes['ui'].render(f"Puntaje: {p}", True, col_p), (x_inicio, y))
-            y += 20
-
+            # Mini-tablero 
             _, bottom = dibujar_mini_tablero(
                 self.pantalla, self.fuentes['mini'],
                 x_inicio, y, 
                 nodo["tablero"], TAMANO_MINI, 
                 self.fade_cache, self.fade_speed, 
-                p, id(nodo)
+                None, id(nodo)
             )
             y = bottom + 20
 
             if depth < len(camino_real) - 1:
                 pygame.draw.line(self.pantalla, pygame.Color(200, 200, 200),
                                  (x_inicio + 40, y - 10), (x_inicio + 40, y + 5), 2)
+
     # ------------------------------
     # DIBUJAR INTERFAZ (principal)
     # ------------------------------
     def dibujar_interfaz(self, tablero, mensaje, tablero_raiz=None, estructura_arbol=None, camino_real=None):
         """
-        dibujar_interfaz ahora acepta camino_real (lista de nodos) además del árbol.
+        Dibuja toda la pantalla.
         """
+        # 1. Extraer el camino lineal del árbol (ya que camino_real viene vacío de main)
+        camino_visual = self._extraer_camino_lineal(estructura_arbol)
+
         if self.fondo_juego:
             self.pantalla.blit(self.fondo_juego, (0, 0))
         else:
             self.pantalla.fill(pygame.Color(COLOR_FONDO))
 
-        mouse_pos = pygame.mouse.get_pos()
-
-                # --- SECCIÓN IZQUIERDA ---
-        # Titulo
+        # --- SECCIÓN IZQUIERDA (TABLERO) ---
         t_tablero = self.fuentes['titulo'].render("TABLERO DEL JUEGO", True, pygame.Color(COLOR_BOTON))
         self.pantalla.blit(t_tablero, t_tablero.get_rect(center=(self.centro_izq, 80)))
         
-        # Subtitulo 
         t_turno = self.fuentes['subtitulo'].render(mensaje, True, pygame.Color(COLOR_X))
         self.pantalla.blit(t_turno, t_turno.get_rect(center=(self.centro_izq, 130)))
 
@@ -226,8 +273,8 @@ class InterfazGrafica:
         
         pygame.draw.rect(self.pantalla, pygame.Color(COLOR_TABLERO), fondo_rect, border_radius=45)
 
+        # Detectar jugada para sonido
         jugada_detectada = False
-        # DETECTAR CAMBIOS
         for i in range(9):
             if self.tablero_previo[i] == " " and tablero[i] != " ":
                 self.animaciones_fichas[i] = 0 
@@ -244,9 +291,9 @@ class InterfazGrafica:
             x = self.inicio_x + col * (TAMANO_CASILLA + ESPACIO)
             y = self.inicio_y + fila * (TAMANO_CASILLA + ESPACIO)
 
+            # Sombra y Casilla
             rect_sombra = pygame.Rect(x, y + 10, TAMANO_CASILLA, TAMANO_CASILLA)
             pygame.draw.rect(self.pantalla, pygame.Color(COLOR_CASILLA_SOMBRA_3D), rect_sombra, border_radius=25)
-
             casilla_rect = pygame.Rect(x, y, TAMANO_CASILLA, TAMANO_CASILLA)
             pygame.draw.rect(self.pantalla, pygame.Color(COLOR_CASILLA), casilla_rect, border_radius=25)
 
@@ -255,10 +302,8 @@ class InterfazGrafica:
                 txt = self.fuentes['ficha'].render(tablero[i], True, color)
 
                 escala = 1.0
-
                 if i in self.animaciones_fichas:
                     frame_actual = int(self.animaciones_fichas[i])
-                    
                     if frame_actual < len(SECUENCIA_PLOP):
                         escala = SECUENCIA_PLOP[frame_actual]
                         self.animaciones_fichas[i] += 1 
@@ -272,10 +317,9 @@ class InterfazGrafica:
                 rect_texto = txt.get_rect(center=(x + TAMANO_CASILLA / 2, y + TAMANO_CASILLA / 2))
                 self.pantalla.blit(txt, rect_texto)
 
-        # BOTÓN Nueva partida
         self.dibujar_boton_redondo(self.rect_boton, "Nuevo Juego")
 
-        # --- SECCIÓN DERECHA ---
+        # --- SECCIÓN DERECHA (HISTORIAL) ---
         t_agente = self.fuentes['subtitulo'].render("Decisiones del Agente", True, pygame.Color(COLOR_BOTON))
         self.pantalla.blit(t_agente, t_agente.get_rect(center=(self.centro_der, 80)))
 
@@ -283,32 +327,13 @@ class InterfazGrafica:
         clip_rect = pygame.Rect(ANCHO_VENTANA//2, 140, ANCHO_VENTANA//2, altura_clip)
         self.pantalla.set_clip(clip_rect)
 
-        y_lista = 160 + self.scroll_camino
-        if camino_real:
-            for i, nodo in enumerate(camino_real):
-                # Línea conectora
-                if i > 0:
-                    pygame.draw.line(self.pantalla, pygame.Color(COLOR_LINEA), (self.centro_der, y_lista - 30), (self.centro_der, y_lista), 2)
-
-                lbl = "IA" if nodo.get("es_turno_ia") else "TÚ"
-                self.pantalla.blit(self.fuentes['ui'].render(lbl, True, pygame.Color(COLOR_TEXTO)), (self.centro_der + 50, y_lista))
-
-                ancho_n = (TAMANO_MINI * 3) + 8
-                _, bottom = dibujar_mini_tablero(
-                    self.pantalla, self.fuentes['mini'],
-                    self.centro_der - ancho_n//2, y_lista, 
-                    nodo["tablero"], TAMANO_MINI, 
-                    self.fade_cache, self.fade_speed, 
-                    nodo.get("puntaje"), id(nodo)
-                )
-                y_lista = bottom + 40                
+        # Dibujamos el camino reconstruido
+        self.dibujar_camino_real(camino_visual, self.centro_der - 100, 160)
             
         self.pantalla.set_clip(None)
 
-        # Botón Ver Árbol Completo
         self.dibujar_boton_redondo(self.rect_boton_arbol, "Ver árbol completo")
         self.dibujar_boton_redondo(self.rect_boton_salir, "Salir")
-
 
         # --- MODAL (Overlay) ---
         if self.modal_abierto:
@@ -317,21 +342,18 @@ class InterfazGrafica:
         pygame.display.flip()
 
     # --------------------
-    # Modal para ver el árbol completo (pantalla completa)
-    # ------------------------------
+    # Modal para ver el árbol completo
+    # --------------------
     def _dibujar_modal_arbol(self, estructura_arbol):
-        # Fondo translúcido
         overlay = pygame.Surface((ANCHO_VENTANA, ALTO_VENTANA), pygame.SRCALPHA)
         overlay.fill((10, 10, 10, 220)) 
         self.pantalla.blit(overlay, (0, 0))
 
-        # Caja central
         margin = 40
         caja = pygame.Rect(margin, margin, ANCHO_VENTANA - margin * 2, ALTO_VENTANA - margin * 2)
         pygame.draw.rect(self.pantalla, pygame.Color("#202040"), caja, border_radius=12)
         pygame.draw.rect(self.pantalla, pygame.Color(COLOR_LINEA), caja, width=2, border_radius=12)
 
-        # Título y cerrar
         titulo = self.fuentes['subtitulo'].render("Árbol Completo de Decisiones del Agente", True, pygame.Color(COLOR_TEXTO))
         titulo_rect = titulo.get_rect(center=(caja.centerx, caja.y + 25))
         self.pantalla.blit(titulo, titulo_rect)
@@ -343,50 +365,29 @@ class InterfazGrafica:
         rect_txt = txt_cerrar.get_rect(center=btn_cerrar.center) 
         self.pantalla.blit(txt_cerrar, rect_txt)     
 
-        # Área interna
         inner_x = caja.x + 20
         inner_y = caja.y + 60
         inner_w = caja.width - 40
         inner_h = caja.height - 80
         rect_area_dibujo = pygame.Rect(inner_x, inner_y, inner_w, inner_h)
 
-        # Clip y Scroll
         previous_clip = self.pantalla.get_clip()
         self.pantalla.set_clip(rect_area_dibujo)
 
         backup_x, backup_y = self.scroll_x, self.scroll_y
         self.scroll_x, self.scroll_y = self.modal_scroll_x, self.modal_scroll_y
 
-        ancho_nodo = (TAMANO_MINI * 3) + 8
-        centro_x = inner_x + inner_w // 2
-
-        # --- DIBUJAR RAÍZ DEL MODAL (ACTUALIZADO) ---
-        punto_raiz = dibujar_mini_tablero(
-            self.pantalla, self.fuentes['mini'],
-            centro_x - ancho_nodo // 2 + self.scroll_x,
-            inner_y + self.scroll_y,
-            [" "]*9, TAMANO_MINI, 
-            self.fade_cache, self.fade_speed, 
-            0, "MODAL_ROOT"
-        )
-
+        # Dibujar árbol recursivo usando la lista completa de hermanos de nivel 0
         if estructura_arbol:
-            self.dibujar_arbol_recursivo(estructura_arbol, inner_x, inner_x + inner_w, inner_y + ESPACIO_VERTICAL_ARBOL, punto_raiz)
+            self.dibujar_arbol_recursivo(estructura_arbol, inner_x, inner_x + inner_w, inner_y + 50)
 
-        # Restaurar
         self.scroll_x, self.scroll_y = backup_x, backup_y
         self.pantalla.set_clip(previous_clip)
 
-        # detectamos clic en cerrar si ocurre (lo maneja obtener_evento_usuario)
-        # no retornamos nada; el main loop hace flip luego.
-
     def obtener_evento_usuario(self):
-        # Le pasamos 'self' para que la función externa pueda modificar
-        # los atributos de esta clase (scrolls, flags, etc.)
         return manejar_eventos(self)
     
     def dibujar_boton_redondo(self, rect, texto):
-        """Dibuja un botón estilo menú pero adaptado a la interfaz"""
         mouse_pos = pygame.mouse.get_pos()
         es_hover = rect.collidepoint(mouse_pos)
         
@@ -395,14 +396,12 @@ class InterfazGrafica:
         color_sombra = (79, 87, 175)
         
         color_actual = color_hover if es_hover else color_base
-        
         elevacion = 4 if es_hover else 0
         
         rect_sombra = rect.copy()
         rect_sombra.y += 6 
         pygame.draw.rect(self.pantalla, color_sombra, rect_sombra, border_radius=25)
         
-        # 2. Botón Visual
         rect_visual = rect.copy()
         rect_visual.y -= elevacion
         pygame.draw.rect(self.pantalla, color_actual, rect_visual, border_radius=25)
@@ -411,9 +410,6 @@ class InterfazGrafica:
         txt_rect = txt_surf.get_rect(center=rect_visual.center)
         self.pantalla.blit(txt_surf, txt_rect)
 
-    # ------------------------------
-    # cerrar
-    # ------------------------------
     def cerrar(self):
         pygame.quit()
         sys.exit()

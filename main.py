@@ -4,10 +4,10 @@ import sys
 import pygame 
 
 from game.logic import LogicaTresRayas
-from game.ai import ia_decidir_movimiento, reconstruir_camino_real, generar_arbol_rama, generar_arbol_con_camino_resaltado, limpiar_cache 
+# Importamos la nueva función unificada y limpiar_cache
+from game.ai import ia_decidir_movimiento, generar_arbol_visual, limpiar_cache 
 from ui.interface import *
 from ui.menu import MenuPrincipal
-from ui.config import * 
 from ui.assets import iniciar_musica_fondo 
 
 def main():
@@ -40,8 +40,8 @@ def main():
         elif accion == "AYUDA":
             print("Aquí iría la pantalla de tutorial")     
     
+    # --- FASE 2: INICIO DEL JUEGO ---
     juego = LogicaTresRayas()
-    
     ui = InterfazGrafica()
     
     turno = "X"
@@ -49,25 +49,28 @@ def main():
     juego_corriendo = True
     juego_terminado_flag = False
     
-    # Ahora la raíz del grafo será un tablero vacío (siempre 9 hijos)
-    tablero_raiz_grafo = [" " for _ in range(9)]
+    # Variables de visualización
+    # estructura_arbol contendrá TODO (pasado y futuro) gracias al refactor
     estructura_arbol = [] 
-    camino_real      = []
-
+    
+    # Inicializamos valores de UI
     ui.scroll_camino = 0
     ui.fade_cache_camino.clear()
-
     ui.modal_scroll_y = 0
     ui.modal_scroll_x = 0
 
-    # Nota: comenzamos con que la IA juega primero (X) — como en tu diseño original
+    # Limpiamos memoria de IA al iniciar
+    limpiar_cache()
+
     while juego_corriendo:
         
-        # 1. DIBUJAR (Pasamos la estructura compleja)
+        # 1. DIBUJAR
+        # Pasamos estructura_arbol. 'camino_real' lo dejamos vacío o None
+        # porque la nueva función ya incluye el camino dentro del árbol.
         ui.dibujar_interfaz(juego.tablero, mensaje_estado,
-                            tablero_raiz=tablero_raiz_grafo,
+                            tablero_raiz=None, # Ya no es necesario con el nuevo método
                             estructura_arbol=estructura_arbol,
-                            camino_real=camino_real)
+                            camino_real=[]) # Pasamos lista vacía para no romper la UI si lo pide
 
         # 2. EVENTOS
         evento = ui.obtener_evento_usuario()
@@ -79,15 +82,18 @@ def main():
             juego.reiniciar()
             turno = "X"
             mensaje_estado = "Juega la IA (X)"
+            
+            # Resetear visualización
             estructura_arbol = []
-            tablero_raiz_grafo = [" " for _ in range(9)]
             juego_terminado_flag = False
-            camino_real      = []
+            
+            # Resetear UI
             ui.scroll_camino = 0          
             ui.fade_cache_camino.clear()
             ui.scroll_x = 0
             ui.scroll_y = 0
-            juego_terminado_flag = False
+            
+            # Limpiar memoria de IA
             limpiar_cache()
             continue
 
@@ -97,8 +103,10 @@ def main():
         if juego.juego_terminado():
             ganador = juego.verificar_ganador()
             mensaje_estado = f"¡Ganó {ganador}!" if ganador else "¡Empate!"
-            estructura_arbol = generar_arbol_con_camino_resaltado(juego.tablero)
-            camino_real = reconstruir_camino_real(juego.tablero)
+            
+            # Generar árbol final completo
+            estructura_arbol = generar_arbol_visual(juego.tablero)
+            
             juego_terminado_flag = True
             continue
 
@@ -106,27 +114,26 @@ def main():
         if turno == "X":
             # --- IA ---
             mensaje_estado = "Pensando..."
+            
+            # Dibujar antes de pensar para que se vea el mensaje
             ui.dibujar_interfaz(juego.tablero, mensaje_estado,
-                            tablero_raiz=tablero_raiz_grafo,
-                            estructura_arbol=estructura_arbol,
-                            camino_real=camino_real)
+                                estructura_arbol=estructura_arbol,
+                                camino_real=[])
             time.sleep(0.3) 
 
             # IA Juega
             movimiento, _ = ia_decidir_movimiento(juego.tablero)
             
             if movimiento is None:
-                # No hay movimiento posible
-                turno = "O"
-                mensaje_estado = "Tu turno"
+                turno = "O" # Caso borde (empate sin detectar)
             else:
                 if juego.realizar_movimiento(movimiento, "X"):
                     turno = "O"
                     mensaje_estado = "Tu turno"
                     
-                    # --- GENERACIÓN DEL ÁRBOL JERÁRQUICO ---
-                    estructura_arbol = generar_arbol_con_camino_resaltado(juego.tablero)   # solo la rama jugada
-                    camino_real = reconstruir_camino_real(juego.tablero)
+                    # --- ACTUALIZAR EL ÁRBOL ---
+                    # Llamamos a la función única refactorizada
+                    estructura_arbol = generar_arbol_visual(juego.tablero)
 
         else:
             # --- HUMANO ---
@@ -135,6 +142,9 @@ def main():
                 if juego.es_movimiento_valido(movimiento):
                     juego.realizar_movimiento(movimiento, "O")
                     turno = "X"
+                    
+                    # Opcional: Actualizar árbol tras jugada humana para ver el cambio inmediato
+                    # estructura_arbol = generar_arbol_visual(juego.tablero)
                 else:
                     mensaje_estado = "¡Casilla ocupada!"
 
