@@ -1,3 +1,5 @@
+# MENU.PY: ARCHIVO DIBUJA LA INTERFAZ DEL MENÚ DEL JUEGO"
+
 import pygame
 import os
 import sys
@@ -28,7 +30,7 @@ class MenuPrincipal:
             self.f_titulo_menu = pygame.font.SysFont("Arial", 80, bold=True)
             self.f_sub_menu = pygame.font.SysFont("Arial", 40, bold=True)
 
-        # Definir botones (Rectángulos)
+        # Definir botones 
         center_x = ANCHO_VENTANA // 2
         start_y = 320  
 
@@ -41,6 +43,10 @@ class MenuPrincipal:
         self.btn_salir = pygame.Rect(0, 0, 390, 100)
         self.btn_salir.center = (center_x, start_y + 280)  
 
+    # --------------------
+    # dibujar_boton
+    # Dibuja un botón con sombra, efecto hover y texto; devuelve True si el mouse está encima.
+    # --------------------
     def dibujar_boton(self, rect, texto, color_base, color_hover):
         mouse_pos = pygame.mouse.get_pos()
         es_hover = rect.collidepoint(mouse_pos)
@@ -65,6 +71,10 @@ class MenuPrincipal:
         
         return es_hover
     
+    # --------------------
+    # actualizar
+    # Pinta fondo, título, subtítulo y los tres botones; reproduce sonido hover al entrar a uno nuevo.
+    # --------------------
     def actualizar(self):
         # Fondo
         if self.fondo:
@@ -86,9 +96,8 @@ class MenuPrincipal:
         self.dibujar_boton(self.btn_ayuda, "¿Cómo Jugar?", (44, 44, 84), (32, 32, 61))
         self.dibujar_boton(self.btn_salir, "Salir",       (44, 44, 84), (32, 32, 61))
 
-        boton_actual_hover = None # ¿Sobre qué botón estamos AHORA?
+        boton_actual_hover = None 
 
-        # Dibujamos y verificamos uno por uno
         if self.dibujar_boton(self.btn_jugar, "Nuevo Juego", (44, 44, 84), (32, 32, 61)):
             boton_actual_hover = "JUGAR"
         
@@ -98,18 +107,19 @@ class MenuPrincipal:
         elif self.dibujar_boton(self.btn_salir, "Salir", (44, 44, 84), (32, 32, 61)):
             boton_actual_hover = "SALIR"
 
-        # Comparamos con el frame anterior para saber si ACABAMOS de entrar
         if boton_actual_hover != self.ultimo_boton_hover:
             if boton_actual_hover is not None:
-                # ¡Es un botón nuevo! Reproducir sonido
                 if 'menu_hover' in self.sonidos:
                     self.sonidos['menu_hover'].play()
             
-            # Actualizamos la memoria
             self.ultimo_boton_hover = boton_actual_hover
 
         pygame.display.flip()
 
+    # --------------------
+    # manejar_eventos
+    # Detecta clic en botones o cerrar ventana; devuelve 'JUGAR', 'AYUDA', 'SALIR' o None.
+    # --------------------        
     def manejar_eventos(self):
         """Retorna 'JUGAR', 'SALIR' o None"""
         for evento in pygame.event.get():
@@ -132,6 +142,5 @@ class MenuPrincipal:
                         if 'menu_click' in self.sonidos:
                             self.sonidos['menu_click'].play()
                         return accion
-            
         return None    
 
