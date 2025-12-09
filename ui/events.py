@@ -1,20 +1,24 @@
-# ui/events.py
+# EVENTS.PY: ARCHIVO CONTIENE LA LÓGICA DE LAS TECLAS, MAUSE Y ACCIONES"
+
 import pygame
 from ui.config import *
+
 # ------------------------------
-    # EVENTOS (scroll y clics)
-    # ------------------------------
+# EVENTOS (scroll y clics)
+# Gestiona todo lo que el usuario hace: cerrar ventana, mover rueda, arrastrar modal, clic en botones o casillas.
+# Devuelve una acción ('SALIR', 'REINICIAR', 'MENU'), el número de casilla (0-8) o None si no pasó nada.
+# ------------------------------
 def manejar_eventos(ui):
     """
-        Maneja:
-         - QUIT
-         - wheel / shift+wheel (árbol)
-         - wheel sobre camino_real (scroll_camino)
-         - flechas (ambos scroll)
-         - clicks (tablero, nueva partida, abrir/cerrar modal)
-         - ESC para cerrar modal
-        Devuelve: 'SALIR', 'REINICIAR', o índice de casilla (0..8) o None
-        """
+    Maneja:
+        - QUIT
+        - wheel / shift+wheel (árbol)
+        - wheel sobre camino_real (scroll_camino)
+        - flechas (ambos scroll)
+        - clicks (tablero, nueva partida, abrir/cerrar modal)
+        - ESC para cerrar modal
+    Devuelve: 'SALIR', 'REINICIAR', 'MENU', o índice de casilla (0..8) o None
+    """
     for evento in pygame.event.get():
         # QUIT
         if evento.type == pygame.QUIT:
@@ -90,9 +94,13 @@ def manejar_eventos(ui):
             if ui.modal_abierto:
                 margin = 40
                 caja = pygame.Rect(margin, margin, ANCHO_VENTANA - margin * 2, ALTO_VENTANA - margin * 2)
-                btn_cerrar = pygame.Rect(caja.right - 110, caja.y + 10, 90, 36)
+                btn_cerrar = pygame.Rect(caja.right - 160, caja.y + 10, 140, 50)
                 
                 if btn_cerrar.collidepoint(mx, my):
+                    # Sonido al cerrar modal
+                    if 'menu_click' in ui.sonidos:
+                        ui.sonidos['menu_click'].play()
+                        
                     ui.modal_abierto = False
                     return None
                 
@@ -102,20 +110,27 @@ def manejar_eventos(ui):
                     ui.mouse_previo = (mx, my)
                 
                 return None
-
-            # Nueva partida (botón)
+            
+            # 1. Nueva partida (botón)
             if ui.rect_boton.collidepoint(mx, my):
+                if 'menu_click' in ui.sonidos:
+                    ui.sonidos['menu_click'].play()
                 return 'REINICIAR'
 
-            # Botón 'Ver árbol completo'
+            # 2. Botón 'Ver árbol completo'
             if ui.rect_boton_arbol.collidepoint(mx, my):
+                if 'menu_click' in ui.sonidos:
+                    ui.sonidos['menu_click'].play()
                 ui.modal_abierto = True
                 ui.modal_scroll_x = 0
                 ui.modal_scroll_y = 0
                 return None
             
+            # 3. Botón 'Salir/Menú' 
             if hasattr(ui, 'rect_boton_salir') and ui.rect_boton_salir.collidepoint(mx, my):
-                    return 'SALIR'
+                if 'menu_click' in ui.sonidos:
+                    ui.sonidos['menu_click'].play()
+                return 'MENU' 
 
             # Clic en tablero principal
             if (ui.inicio_x < mx < ui.inicio_x + ui.ancho_juego and
