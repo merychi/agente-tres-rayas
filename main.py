@@ -1,14 +1,14 @@
-# main.py
+# MENU.PY: Ejecutador del juego"
 import time
 import sys
 import pygame 
 
 from game.logic import LogicaTresRayas
-# Importamos la nueva función unificada y limpiar_cache
 from game.ai import ia_decidir_movimiento, generar_arbol_visual, limpiar_cache 
 from ui.interface import *
 from ui.menu import MenuPrincipal
 from ui.assets import iniciar_musica_fondo 
+from ui.help import *
 
 def main():
     pygame.init()
@@ -16,139 +16,149 @@ def main():
     
     iniciar_musica_fondo()
     
-    # Creamos la ventana para el menú
     pantalla_principal = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
     pygame.display.set_caption("Tres en Raya - Minimax")
 
-    # --- FASE 1: BUCLE DEL MENÚ ---
-    menu = MenuPrincipal(pantalla_principal)
-    en_menu = True
-    clock_menu = pygame.time.Clock()
+    # --- BUCLE MAESTRO: Permite que el juego se reinicie desde el menú ---
+    while True:
+        # ---  MENÚ ---
+        menu = MenuPrincipal(pantalla_principal)
+        en_menu = True
+        clock_menu = pygame.time.Clock()
 
-    while en_menu:
-        clock_menu.tick(60)
+        proximo_estado = "JUEGO" 
+
+        while en_menu:
+            clock_menu.tick(60)
+            accion = menu.manejar_eventos()
+            menu.actualizar()
+
+            if accion == "SALIR":
+                pygame.quit(); sys.exit()
+            
+            elif accion == "JUGAR":
+                proximo_estado = "JUEGO"
+                en_menu = False
+            
+            elif accion == "AYUDA":  
+                proximo_estado = "AYUDA"
+                en_menu = False 
+
+        # --- PANTALLA DE AYUDA ---
+        if proximo_estado == "AYUDA":
+            ayuda = PantallaAyuda(pantalla_principal)
+            en_ayuda = True
+            while en_ayuda:
+                clock_menu.tick(60)
+                accion = ayuda.manejar_eventos()
+                ayuda.actualizar()
+
+                if accion == "SALIR":
+                    pygame.quit(); sys.exit()
+                elif accion == "MENU":
+                    en_ayuda = False 
+            
+            continue 
+
+        # --- INICIO DEL JUEGO ---
+        juego = LogicaTresRayas()
+        ui = InterfazGrafica()
         
-        # Dibujar y lógica del menú
-        accion = menu.manejar_eventos()
-        menu.actualizar()
-
-        if accion == "SALIR":
-            pygame.quit()
-            sys.exit()
-        elif accion == "JUGAR":
-            en_menu = False # Rompemos el bucle y pasamos al juego
-        elif accion == "AYUDA":
-            print("Aquí iría la pantalla de tutorial")     
-    
-    # --- FASE 2: INICIO DEL JUEGO ---
-    juego = LogicaTresRayas()
-    ui = InterfazGrafica()
-    
-    turno = "X"
-    mensaje_estado = "Juega la IA (X)"
-    juego_corriendo = True
-    juego_terminado_flag = False
-    
-    # Variables de visualización
-    # estructura_arbol contendrá TODO (pasado y futuro) gracias al refactor
-    estructura_arbol = [] 
-    
-    # Inicializamos valores de UI
-    ui.scroll_camino = 0
-    ui.fade_cache_camino.clear()
-    ui.modal_scroll_y = 0
-    ui.modal_scroll_x = 0
-
-    # Limpiamos memoria de IA al iniciar
-    limpiar_cache()
-
-    while juego_corriendo:
+        turno = "X"
+        mensaje_estado = "Juega la IA (X)"
+        juego_corriendo = True
+        juego_terminado_flag = False
         
-        # 1. DIBUJAR
-        # Pasamos estructura_arbol. 'camino_real' lo dejamos vacío o None
-        # porque la nueva función ya incluye el camino dentro del árbol.
-        ui.dibujar_interfaz(juego.tablero, mensaje_estado,
-                            tablero_raiz=None, # Ya no es necesario con el nuevo método
-                            estructura_arbol=estructura_arbol,
-                            camino_real=[]) # Pasamos lista vacía para no romper la UI si lo pide
-
-        # 2. EVENTOS
-        evento = ui.obtener_evento_usuario()
-
-        if evento == 'SALIR':
-            juego_corriendo = False; break
+        estructura_arbol = [] 
         
-        if evento == 'REINICIAR':
-            juego.reiniciar()
-            turno = "X"
-            mensaje_estado = "Juega la IA (X)"
-            
-            # Resetear visualización
-            estructura_arbol = []
-            juego_terminado_flag = False
-            
-            # Resetear UI
-            ui.scroll_camino = 0          
-            ui.fade_cache_camino.clear()
-            ui.scroll_x = 0
-            ui.scroll_y = 0
-            
-            # Limpiar memoria de IA
-            limpiar_cache()
-            continue
+        ui.scroll_camino = 0
+        ui.fade_cache_camino.clear()
+        ui.modal_scroll_y = 0
+        ui.modal_scroll_x = 0
 
-        if juego_terminado_flag: 
-            continue
+        limpiar_cache()
 
-        if juego.juego_terminado():
-            ganador = juego.verificar_ganador()
-            mensaje_estado = f"¡Ganó {ganador}!" if ganador else "¡Empate!"
+        while juego_corriendo:
             
-            # Generar árbol final completo
-            estructura_arbol = generar_arbol_visual(juego.tablero)
-            
-            juego_terminado_flag = True
-            continue
-
-        # 3. TURNOS
-        if turno == "X":
-            # --- IA ---
-            mensaje_estado = "Pensando..."
-            
-            # Dibujar antes de pensar para que se vea el mensaje
+            # 1. DIBUJAR
             ui.dibujar_interfaz(juego.tablero, mensaje_estado,
+                                tablero_raiz=None, 
                                 estructura_arbol=estructura_arbol,
-                                camino_real=[])
-            time.sleep(0.3) 
+                                camino_real=[],
+                                combo_ganador=juego.combo_ganador) 
 
-            # IA Juega
-            movimiento, _ = ia_decidir_movimiento(juego.tablero)
+            # 2. EVENTOS
+            evento = ui.obtener_evento_usuario()
+
+            if evento == 'SALIR':
+                pygame.quit()
+                sys.exit()
+
+            if evento == 'MENU':
+                juego_corriendo = False 
+                break 
+            # ------------------------------------------
             
-            if movimiento is None:
-                turno = "O" # Caso borde (empate sin detectar)
-            else:
-                if juego.realizar_movimiento(movimiento, "X"):
-                    turno = "O"
-                    mensaje_estado = "Tu turno"
-                    
-                    # --- ACTUALIZAR EL ÁRBOL ---
-                    # Llamamos a la función única refactorizada
-                    estructura_arbol = generar_arbol_visual(juego.tablero)
+            if evento == 'REINICIAR':
+                juego.reiniciar()
+                turno = "X"
+                mensaje_estado = "Juega la IA (X)"
+                
+                estructura_arbol = []
+                juego_terminado_flag = False
+                
+                ui.scroll_camino = 0          
+                ui.fade_cache_camino.clear()
+                ui.scroll_x = 0
+                ui.scroll_y = 0
+                
+                limpiar_cache()
+                continue
 
-        else:
-            # --- HUMANO ---
-            if isinstance(evento, int): 
-                movimiento = evento
-                if juego.es_movimiento_valido(movimiento):
-                    juego.realizar_movimiento(movimiento, "O")
-                    turno = "X"
-                    
-                    # Opcional: Actualizar árbol tras jugada humana para ver el cambio inmediato
-                    # estructura_arbol = generar_arbol_visual(juego.tablero)
+            if juego_terminado_flag: 
+                continue
+
+            if juego.juego_terminado():
+                ganador = juego.verificar_ganador()
+                mensaje_estado = f"¡Ganó {ganador}!" if ganador else "¡Empate!"
+
+                if ganador: 
+                    if 'win' in ui.sonidos:
+                        ui.sonidos['win'].play()
+                        
+                estructura_arbol = generar_arbol_visual(juego.tablero)
+                juego_terminado_flag = True
+                continue
+
+            # TURNOS
+            if turno == "X":
+                # --- IA ---
+                mensaje_estado = "Pensando..."
+                ui.dibujar_interfaz(juego.tablero, mensaje_estado,
+                                    estructura_arbol=estructura_arbol,
+                                    camino_real=[],
+                                    combo_ganador=juego.combo_ganador)
+                time.sleep(0.3) 
+
+                movimiento, _ = ia_decidir_movimiento(juego.tablero)
+                
+                if movimiento is None:
+                    turno = "O" 
                 else:
-                    mensaje_estado = "¡Casilla ocupada!"
+                    if juego.realizar_movimiento(movimiento, "X"):
+                        turno = "O"
+                        mensaje_estado = "Tu turno"
+                        estructura_arbol = generar_arbol_visual(juego.tablero)
 
-    ui.cerrar()
+            else:
+                # --- HUMANO ---
+                if isinstance(evento, int): 
+                    movimiento = evento
+                    if juego.es_movimiento_valido(movimiento):
+                        juego.realizar_movimiento(movimiento, "O")
+                        turno = "X"
+                    else:
+                        mensaje_estado = "¡Casilla ocupada!"
 
 if __name__ == "__main__":
     main()
