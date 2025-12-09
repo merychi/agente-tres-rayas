@@ -1,6 +1,7 @@
-# game/ai.py
+# AI.PY: Archivo que contiene la lógica del agente"
 from game.logic import LogicaTresRayas
 from copy import deepcopy
+import time
 
 # --- MEMORIA GLOBAL (CACHE) ---
 CACHE_MINIMAX = {}
@@ -8,6 +9,12 @@ CACHE_MINIMAX = {}
 def limpiar_cache():
     """Limpia la memoria para reiniciar partida"""
     CACHE_MINIMAX.clear()
+
+    #Para evaluación del tiempo que tarda la IA en 
+    print("\n" + "="*65)
+    print("\n" "Control velocidad de respuesta de la AI")
+    print(f"{'TURNO':^10} | {'JUGADOR':^10} | {'TIEMPO (s)':^15} | {'EVALUACION':^15}")
+    print("-" * 65)
 
 def minimax(tablero, profundidad, es_turno_max):
     """
@@ -58,6 +65,8 @@ def ia_decidir_movimiento(tablero):
     Decide el mejor movimiento para la IA en el estado actual.
     Retorna: (mejor_movimiento, datos_visuales_no_usados)
     """
+    tiempo_inicio = time.time()
+
     mejor_puntaje = -float('inf')
     mejor_movimiento = None
     
@@ -73,11 +82,22 @@ def ia_decidir_movimiento(tablero):
             if puntaje > mejor_puntaje:
                 mejor_puntaje = puntaje
                 mejor_movimiento = movimiento
-                
+
+
+    tiempo_fin = time.time()
+    duracion = tiempo_fin - tiempo_inicio    
+
+    fichas_puestas = 9 - tablero.count(" ")
+    numero_turno = fichas_puestas + 1
+    
+    # 4. IMPRIMIR FILA EN LA CONSOLA
+    # Formato: Turno | Jugador | Tiempo con 6 decimales | Puntaje esperado
+    print(f"{numero_turno:^10} | {'IA (X)':^10} | {duracion:^15.6f} | {mejor_puntaje:^15}")
+        
     return mejor_movimiento, []
 
 # ---------------------------------------------------------
-#  NUEVA FUNCIÓN DE VISUALIZACIÓN UNIFICADA (REFACTORIZADA)
+#  NUEVA FUNCIÓN DE VISUALIZACIÓN UNIFICADA 
 # ---------------------------------------------------------
 
 def generar_arbol_visual(tablero_final):
