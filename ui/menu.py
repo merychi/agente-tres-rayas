@@ -20,16 +20,7 @@ class MenuPrincipal:
         except FileNotFoundError:
             print("ERROR: No se encontró fondo_menu.png. Usando color sólido.")
             self.fondo = None
-
-        ruta_fuente = os.path.join(os.path.dirname(__file__), '..', 'assets', 'BubbleboddyNeue-ExtraBold Trial.ttf')
-        r_fuente = os.path.join(os.path.dirname(__file__), '..', 'assets', 'BubbleboddyNeue-Bold Trial.ttf')
-        try:
-            self.f_titulo_menu = pygame.font.Font(ruta_fuente, 95) 
-            self.f_sub_menu = pygame.font.Font(r_fuente, 45)
-        except FileNotFoundError:
-            self.f_titulo_menu = pygame.font.SysFont("Arial", 80, bold=True)
-            self.f_sub_menu = pygame.font.SysFont("Arial", 40, bold=True)
-
+            
         # Definir botones 
         center_x = ANCHO_VENTANA // 2
         start_y = 320  
@@ -84,13 +75,21 @@ class MenuPrincipal:
 
         #Títulos 
         color_titulo = (45, 42, 85) 
-        texto_titulo = self.f_titulo_menu.render("TIC TAC TOE", True, color_titulo)
+        texto_titulo = self.fuentes['titulo_menu'].render("TIC TAC TOE", True, color_titulo)
         self.pantalla.blit(texto_titulo, (40, 90))
 
         # Subtítulo
         color_sub = (235, 186, 239)
-        texto_sub = self.f_sub_menu.render("Tres en raya", True, color_sub)
+        texto_sub = self.fuentes['subtitulo_menu'].render("Tres en raya", True, color_sub)
         self.pantalla.blit(texto_sub, (45, 185))
+
+        # --- DIBUJAR CRÉDITOS ---
+        color_creditos = (200, 200, 255) 
+        texto_creditos = "© Julio Romero & Merry-am Blanco"
+        surf_creditos = self.fuentes['creditos'].render(texto_creditos, True, color_creditos)
+        
+        rect_creditos = surf_creditos.get_rect(bottomleft=(20, ALTO_VENTANA - 20))
+        self.pantalla.blit(surf_creditos, rect_creditos)
         
         self.dibujar_boton(self.btn_jugar, "Nuevo Juego", (44, 44, 84), (32, 32, 61))
         self.dibujar_boton(self.btn_ayuda, "¿Cómo Jugar?", (44, 44, 84), (32, 32, 61))

@@ -23,6 +23,8 @@ def cargar_fuentes():
         # Intentar cargar fuente bonita
         fuentes['titulo'] = pygame.font.Font(ruta_fuente, 45) 
         fuentes['subtitulo'] = pygame.font.Font(ruta_fuente, 35) 
+        fuentes['titulo_menu'] = pygame.font.Font(r_fuente, 95) 
+        fuentes['subtitulo_menu'] = pygame.font.Font(ruta_fuente, 45) 
         fuentes['ficha'] = pygame.font.Font(ruta_fuente, 65)
         fuentes['boton'] = pygame.font.Font(ruta_fuente, 22)    
         fuentes['boton_menu'] = pygame.font.Font(ruta_fuente, 38)
@@ -31,6 +33,7 @@ def cargar_fuentes():
         fuentes['ayuda_sub'] = pygame.font.Font(ruta_fuente, 19)
         fuentes['ui'] = pygame.font.Font(ruta_fuente, 16)
         fuentes['numeros'] = pygame.font.SysFont(rut_fuente, 20, bold=True) 
+        fuentes['creditos'] = pygame.font.Font(ruta_fuente, 20)
     except FileNotFoundError:
         print("AVISO: Usando fuentes del sistema.")
         # Fallback a fuentes del sistema
