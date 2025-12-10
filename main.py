@@ -2,18 +2,19 @@
 import time
 import sys
 import pygame 
+import os
 
 from game.logic import LogicaTresRayas
 from game.ai import ia_decidir_movimiento, generar_arbol_visual, limpiar_cache 
 from ui.interface import *
 from ui.menu import MenuPrincipal
-from ui.assets import iniciar_musica_fondo 
+from ui.assets import *
 from ui.help import *
 
 def main():
     pygame.init()
     pygame.mixer.init()
-    
+    establecer_icono_ventana()
     iniciar_musica_fondo()
     
     pantalla_principal = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
