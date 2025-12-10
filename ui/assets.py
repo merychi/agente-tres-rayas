@@ -9,6 +9,21 @@ def cargar_fondos():
     return fondos
 
 # ------------------------------
+# Carga y establece el icono de la ventana del juego.
+# ------------------------------
+def establecer_icono_ventana():
+
+    ruta_icono = os.path.join(os.path.dirname(__file__), '..', 'assets', 'icono.png')
+    
+    try:
+        icono = pygame.image.load(ruta_icono)
+        pygame.display.set_icon(icono)
+    except FileNotFoundError:
+        print("AVISO: No se encontró 'assets/icono.png'. Se usará el icono predeterminado.")
+    except pygame.error:
+        print("AVISO: Error al leer el formato de la imagen del icono.")
+
+# ------------------------------
 # Intenta cargar la fuente personalizada, si falla, usa las del sistema.
 # Devuelve un diccionario con todas las fuentes listas.
 # ------------------------------
